@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Rpc, RpcRepository } from "@yunu-lab/rpc-ts";
+import type { Rpc, RpcRepository } from "@yunu-lab/rpc-ts";
 import { JSX, ReactNode } from "react";
 import { Provider } from "react-redux";
 import { Store } from "@reduxjs/toolkit";

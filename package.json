@@ -11,13 +11,13 @@
         "state-management",
         "remote-procedure-call"
     ],
-    "homepage": "https://github.com/WWDanchik/rpc#readme",
+    "homepage": "https://github.com/WWDanchik/rpc-react#readme",
     "bugs": {
-        "url": "https://github.com/WWDanchik/rpc/issues"
+        "url": "https://github.com/WWDanchik/rpc-react/issues"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/WWDanchik/rpc.git"
+        "url": "git+https://github.com/WWDanchik/rpc-react.git"
     },
     "license": "MIT",
     "author": "Daniyar",

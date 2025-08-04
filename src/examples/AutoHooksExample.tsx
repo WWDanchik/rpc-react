@@ -31,9 +31,18 @@ const rectangleSchema = z.object({
     createdByUserId: z.number().optional(),
 });
 
+// Пример типа с подчеркиванием
+const cell_codeSchema = z.object({
+    id: z.number(),
+    code: z.string(),
+    description: z.string(),
+    isActive: z.boolean(),
+});
+
 const userRpc = new Rpc("user", userSchema, "id");
 const productRpc = new Rpc("product", productSchema, "id");
 const rectangleRpc = new Rpc("rectangle", rectangleSchema, "id");
+const cell_codeRpc = new Rpc("cell_code", cell_codeSchema, "id");
 
 const repository = new RpcRepository()
     .registerRpc("user", userRpc, (id) => {
@@ -49,7 +58,8 @@ const repository = new RpcRepository()
         });
     })
     .registerRpc("product", productRpc)
-    .registerRpc("rectangle", rectangleRpc);
+    .registerRpc("rectangle", rectangleRpc)
+    .registerRpc("cell_code", cell_codeRpc);
 
 repository.defineRelation("user", "product", "ownedProducts").hasMany(
     {
@@ -110,6 +120,13 @@ repository.save("rectangle", {
     createdByUserId: 1,
 });
 
+repository.save("cell_code", {
+    id: 1,
+    code: "ABC123",
+    description: "Sample cell code",
+    isActive: true,
+});
+
 repository.handleMessages([
     {
         type: "user",
@@ -165,11 +182,56 @@ const {
     useDataListener,
     useUserRelated,
     useProductRelated,
+    useCellCode,
 } = createRpcHooks<RepositoryTypes<typeof repository>>([
     "product",
     "rectangle",
     "user",
+    "cell_code",
 ]);
+
+// Компонент для работы с cell_code (демонстрация snake_case -> camelCase)
+const CellCodeList: React.FC = () => {
+    const { cell_codes } = useCellCode();
+
+    return (
+        <div
+            style={{
+                background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+                padding: "20px",
+                borderRadius: "12px",
+                color: "white",
+                minWidth: "300px",
+            }}
+        >
+            <h2 style={{ margin: "0 0 20px 0", fontSize: "24px" }}>📱 Cell Codes</h2>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {cell_codes.map((cellCode) => (
+                    <li
+                        key={cellCode.id}
+                        style={{
+                            background: "rgba(255,255,255,0.1)",
+                            margin: "10px 0",
+                            padding: "15px",
+                            borderRadius: "8px",
+                            border: "1px solid rgba(255,255,255,0.2)",
+                        }}
+                    >
+                        <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                            {cellCode.code}
+                        </div>
+                        <div style={{ fontSize: "14px", opacity: 0.9 }}>
+                            {cellCode.description}
+                        </div>
+                        <div style={{ fontSize: "12px", opacity: 0.8 }}>
+                            Status: {cellCode.isActive ? "✅ Active" : "❌ Inactive"}
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
 
 // Компонент для работы с пользователями
 const UsersList: React.FC = () => {
@@ -1258,6 +1320,7 @@ const App: React.FC = () => {
                     >
                         <UsersList />
                         <ProductsList />
+                        <CellCodeList />
                     </div>
 
                     <ItemDetails />

@@ -7,6 +7,11 @@ import { z } from "zod";
 
 type InferRpcType<T> = T extends Rpc<infer S> ? z.infer<S> : never;
 
+// Преобразует snake_case в PascalCase для названий хуков
+type ToPascalCase<S extends string> = S extends `${infer First}_${infer Rest}`
+    ? `${Capitalize<First>}${ToPascalCase<Rest>}`
+    : Capitalize<S>;
+
 interface RpcState<TTypes extends Record<string, Rpc<any>>> {
     rpc: {
         [K in keyof TTypes]?: Record<string | number, InferRpcType<TTypes[K]>>;
@@ -14,7 +19,7 @@ interface RpcState<TTypes extends Record<string, Rpc<any>>> {
 }
 
 type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
-    [K in keyof TTypes as `use${Capitalize<string & K>}`]: {
+    [K in keyof TTypes as `use${ToPascalCase<string & K>}`]: {
         (): {
             [P in K as `${P & string}s`]: InferRpcType<TTypes[P]>[];
         } & {
@@ -29,13 +34,13 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
         (id: string | number): InferRpcType<TTypes[K]> | null;
     };
 } & {
-    [K in keyof TTypes as `use${Capitalize<string & K>}FullRelatedData`]: <
+    [K in keyof TTypes as `use${ToPascalCase<string & K>}FullRelatedData`]: <
         TResult = InferRpcType<TTypes[K]>
     >(
         id?: string | number
     ) => TResult | TResult[] | null;
 } & {
-    [K in keyof TTypes as `use${Capitalize<string & K>}Listener`]: (
+    [K in keyof TTypes as `use${ToPascalCase<string & K>}Listener`]: (
         callback: (events: Array<{
             type: K;
             payload: InferRpcType<TTypes[K]>[];
@@ -51,7 +56,7 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
         options?: { types?: (keyof TTypes)[] }
     ) => () => void;
 } & {
-    [K in keyof TTypes as `use${Capitalize<string & K>}Related`]: <TTarget extends keyof TTypes>(
+    [K in keyof TTypes as `use${ToPascalCase<string & K>}Related`]: <TTarget extends keyof TTypes>(
         id: string | number,
         targetType: TTarget
     ) => Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>;
@@ -60,13 +65,21 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
 export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     typeKeys: Array<keyof TTypes>
 ): RpcHooks<TTypes> => {
+    // Преобразует snake_case в camelCase и делает первую букву заглавной
+    const toPascalCase = (s: string): string => {
+        return s
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join('');
+    };
+
     const capitalize = (s: string): string =>
         s.charAt(0).toUpperCase() + s.slice(1);
 
     const hooks = {} as RpcHooks<TTypes>;
 
     typeKeys.forEach((typeName) => {
-        const hookName = `use${capitalize(
+        const hookName = `use${toPascalCase(
             String(typeName)
         )}` as keyof RpcHooks<TTypes>;
         const typeKey = typeName as keyof TTypes;

@@ -20,6 +20,8 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
+        'react',
+        'react-dom',
         'react-redux',
         '@reduxjs/toolkit',
         '@yunu-lab/rpc-ts',
@@ -27,6 +29,8 @@ export default defineConfig({
       ],
       output: {
         globals: {
+          'react': 'React',
+          'react-dom': 'ReactDOM',
           'react-redux': 'ReactRedux',
           '@reduxjs/toolkit': 'ReduxToolkit',
           '@yunu-lab/rpc-ts': 'RpcTs',

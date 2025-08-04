@@ -30,7 +30,7 @@ export const RpcProvider = <TTypes extends Record<string, Rpc<any>>>({
     return (
         <Provider store={store}>
             <RpcContext.Provider value={contextValue as RpcContextType<any>}>
-                {children}
+                <>{children}</>
             </RpcContext.Provider>
         </Provider>
     );

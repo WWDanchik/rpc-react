@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useContext } from "react";
-import { Rpc } from "@yunu-lab/rpc-ts";
-import { RpcContext } from "../context/RpcContext";
-import { RpcContextType } from "../providers/RpcProvider";
+import { Rpc, RpcRepository } from "@yunu-lab/rpc-ts";
+import { RpcContext } from "../providers/RpcStoreProvider";
+
+export interface RpcContextType<TTypes extends Record<string, Rpc<any>>> {
+    repository: RpcRepository<TTypes>;
+}
 
 export const useRpc = <
     TTypes extends Record<string, Rpc<any>>
@@ -13,5 +16,7 @@ export const useRpc = <
         throw new Error("useRpc must be used within an RpcProvider");
     }
 
-    return context as RpcContextType<TTypes>;
+    return {
+        repository: context.repository as unknown as RpcRepository<TTypes>
+    };
 };

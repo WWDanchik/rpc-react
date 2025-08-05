@@ -7,7 +7,6 @@ import { z } from "zod";
 
 type InferRpcType<T> = T extends Rpc<infer S> ? z.infer<S> : never;
 
-// Преобразует snake_case в PascalCase для названий хуков
 type ToPascalCase<S extends string> = S extends `${infer First}_${infer Rest}`
     ? `${Capitalize<First>}${ToPascalCase<Rest>}`
     : Capitalize<S>;
@@ -65,7 +64,6 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
 export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     typeKeys: Array<keyof TTypes>
 ): RpcHooks<TTypes> => {
-    // Преобразует snake_case в camelCase и делает первую букву заглавной
     const toPascalCase = (s: string): string => {
         return s
             .split('_')
@@ -84,15 +82,11 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         )}` as keyof RpcHooks<TTypes>;
         const typeKey = typeName as keyof TTypes;
 
-        const hook = (id?: string | number) => {
-            // eslint-disable-next-line react-hooks/rules-of-hooks
+        function useHook(id?: string | number) {
             const { repository } = useRpc<TTypes>();
-
-            // eslint-disable-next-line react-hooks/rules-of-hooks
             const allData = useSelector(
                 (state: RpcState<TTypes>) => state.rpc[typeKey] || {}
             );
-
             const findById = (id: string | number) =>
                 repository.findById(typeKey, id);
             const findAll = () => repository.findAll(typeKey);
@@ -106,46 +100,32 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             ) => repository.mergeRpc(typeKey, data);
 
             if (id !== undefined) {
-                return (
-                    (allData[id] as InferRpcType<
-                        TTypes[typeof typeKey]
-                    > | null) || null
-                );
+                return findById(id);
             }
-
-            const types = Object.values(allData) as InferRpcType<
-                TTypes[typeof typeKey]
-            >[];
             return {
-                [`${String(typeName)}s`]: types,
+                [`${String(typeKey)}s`]: Object.values(allData) as InferRpcType<TTypes[typeof typeKey]>[],
                 findById,
                 findAll,
                 mergeRpc,
-            };
-        };
+            } as any;
+        }
 
-        (hooks as any)[hookName] = hook;
-    });
+        (hooks as any)[hookName] = useHook;
 
-    typeKeys.forEach((typeName) => {
-        const fullRelatedHookName = `use${capitalize(
+        const fullRelatedHookName = `use${toPascalCase(
             String(typeName)
         )}FullRelatedData` as keyof RpcHooks<TTypes>;
 
-        const fullRelatedHook = <
-            TResult = InferRpcType<TTypes[typeof typeName]>
-        >(
+        function useFullRelatedHook<TResult = InferRpcType<TTypes[typeof typeName]>>(
             id?: string | number
-        ) => {
-            // eslint-disable-next-line react-hooks/rules-of-hooks
+        ) {
             const { repository } = useRpc<TTypes>();
-
-            // eslint-disable-next-line react-hooks/rules-of-hooks
+            const allRpcData = useSelector(
+                (state: RpcState<TTypes>) => state.rpc
+            );
             const [fullData, setFullData] = React.useState<
                 TResult | TResult[] | null
             >(null);
-
-            // eslint-disable-next-line react-hooks/rules-of-hooks
             React.useEffect(() => {
                 const getData = () => {
                     try {
@@ -154,145 +134,106 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                             id
                         ) as TResult | TResult[] | null;
                         setFullData(result);
-                    } catch (error) {
-                        console.error(
-                            `Error getting full related data for ${String(
-                                typeName
-                            )}:`,
-                            error
-                        );
+                    } catch {
                         setFullData(null);
                     }
                 };
-
                 getData();
-            }, [repository, id]);
-
+            }, [repository, id, allRpcData]);
             return fullData;
-        };
-
-        (hooks as any)[fullRelatedHookName] = fullRelatedHook;
+        }
+        (hooks as any)[fullRelatedHookName] = useFullRelatedHook;
     });
 
-    // Добавляем хуки для слушания изменений
     typeKeys.forEach((typeName) => {
         const listenerHookName = `use${capitalize(
             String(typeName)
         )}Listener` as keyof RpcHooks<TTypes>;
         
-        const listenerHook = (
+        function useListenerHook(
             callback: (events: Array<{
                 type: typeof typeName;
                 payload: InferRpcType<TTypes[typeof typeName]>[];
             }>) => void,
             options?: { types?: (typeof typeName)[] }
-        ) => {
-            // eslint-disable-next-line react-hooks/rules-of-hooks
+        ) {
             const { repository } = useRpc<TTypes>();
-            
-            // eslint-disable-next-line react-hooks/rules-of-hooks
             React.useEffect(() => {
                 const listenerId = (repository as any).onDataChanged(
                     callback,
                     { types: options?.types || [typeName] }
                 );
-                
-                // Возвращаем функцию для отписки
                 return () => {
                     if (listenerId && typeof (repository as any).removeListener === 'function') {
                         (repository as any).removeListener(listenerId);
                     }
                 };
             }, [repository, callback, options?.types]);
-            
-            // Возвращаем функцию для ручной отписки
-            return () => {
-                // Эта функция может быть вызвана вручную для отписки
-            };
-        };
-
-        (hooks as any)[listenerHookName] = listenerHook;
+            return () => {};
+        }
+        (hooks as any)[listenerHookName] = useListenerHook;
     });
 
-    // Добавляем универсальный хук для слушания всех изменений
-    const useDataListener = (
+    function useDataListener(
         callback: (events: Array<{
             type: keyof TTypes;
             payload: any[];
         }>) => void,
         options?: { types?: (keyof TTypes)[] }
-    ) => {
-        // eslint-disable-next-line react-hooks/rules-of-hooks
+    ) {
         const { repository } = useRpc<TTypes>();
-        
-        // eslint-disable-next-line react-hooks/rules-of-hooks
         React.useEffect(() => {
             const listenerId = (repository as any).onDataChanged(
                 callback,
                 { types: options?.types || typeKeys }
             );
-            
-            // Возвращаем функцию для отписки
             return () => {
                 if (listenerId && typeof (repository as any).removeListener === 'function') {
                     (repository as any).removeListener(listenerId);
                 }
             };
         }, [repository, callback, options?.types]);
-        
-        // Возвращаем функцию для ручной отписки
-        return () => {
-            // Эта функция может быть вызвана вручную для отписки
-        };
-    };
-
+        return () => {};
+    }
     (hooks as any).useDataListener = useDataListener;
 
-    // Добавляем хуки для получения связанных данных
     typeKeys.forEach((typeName) => {
         const relatedHookName = `use${capitalize(
             String(typeName)
         )}Related` as keyof RpcHooks<TTypes>;
         
-        const relatedHook = <TTarget extends keyof TTypes>(
+        function useRelatedHook<TTarget extends keyof TTypes>(
             id: string | number,
             targetType: TTarget
-        ) => {
-            // eslint-disable-next-line react-hooks/rules-of-hooks
+        ) {
             const { repository } = useRpc<TTypes>();
-            
-            // eslint-disable-next-line react-hooks/rules-of-hooks
+            const sourceData = useSelector(
+                (state: RpcState<TTypes>) => state.rpc[typeName] || {}
+            );
+            const targetData = useSelector(
+                (state: RpcState<TTypes>) => state.rpc[targetType] || {}
+            );
             const [relatedData, setRelatedData] = React.useState<Array<
                 TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never
             >>([]);
-            
-            // eslint-disable-next-line react-hooks/rules-of-hooks
             React.useEffect(() => {
                 const getRelatedData = () => {
                     try {
-                        // Используем метод getRelated из репозитория
                         const result = (repository as any).getRelated(
                             typeName,
                             id,
                             targetType
                         );
                         setRelatedData(result);
-                    } catch (error) {
-                        console.error(
-                            `Error getting related data for ${String(typeName)}:`,
-                            error
-                        );
+                    } catch {
                         setRelatedData([]);
                     }
                 };
-                
                 getRelatedData();
-            }, [repository, typeName, id, targetType]);
-            
+            }, [repository, id, targetType, sourceData, targetData]);
             return relatedData;
-        };
-
-        (hooks as any)[relatedHookName] = relatedHook;
+        }
+        (hooks as any)[relatedHookName] = useRelatedHook;
     });
 
     return hooks;

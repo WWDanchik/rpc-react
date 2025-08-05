@@ -2,9 +2,10 @@
 import { RepositoryTypes, Rpc, RpcRepository } from "@yunu-lab/rpc-ts";
 import React from "react";
 import { z } from "zod";
+import { Provider } from "react-redux";
 import { createRpcHooks } from "../hooks/createRpcHooks";
-import { RpcProvider } from "../providers/RpcProvider";
-import { configureRpcStore } from "../store/configureRpcStore";
+import { RpcProvider } from "../providers/RpcStoreProvider";
+import { extendStore } from "../store/extendStore";
 
 const userSchema = z.object({
     id: z.number(),
@@ -169,8 +170,40 @@ setTimeout(() => {
     ]);
 }, 3000);
 
-const { store, repository: configuredRepository } =
-    configureRpcStore(repository);
+// ========================================
+// ПРИМЕР ИСПОЛЬЗОВАНИЯ БИБЛИОТЕКИ
+// ========================================
+
+// 1. Пользователь создает свой store с Redux Toolkit
+import { configureStore, createSlice } from "@reduxjs/toolkit";
+
+// Пользовательские reducers
+const userSlice = createSlice({
+    name: "user",
+    initialState: { currentUser: null },
+    reducers: {
+        setCurrentUser: (state: any, action: any) => {
+            state.currentUser = action.payload;
+        },
+    },
+});
+
+// Пользовательский store
+const userStore = configureStore({
+    reducer: {
+        user: userSlice.reducer,
+    },
+});
+
+// 2. Расширяем существующий store RPC функциональностью
+const { store: extendedStore, repository: configuredRepository } = extendStore({
+    repository,
+    store: userStore,
+});
+
+// Теперь extendedStore содержит:
+// - user: { currentUser: null } (пользовательский reducer)
+// - rpc: { user: {...}, product: {...} } (RPC reducer)
 
 const {
     useUser,
@@ -204,7 +237,9 @@ const CellCodeList: React.FC = () => {
                 minWidth: "300px",
             }}
         >
-            <h2 style={{ margin: "0 0 20px 0", fontSize: "24px" }}>📱 Cell Codes</h2>
+            <h2 style={{ margin: "0 0 20px 0", fontSize: "24px" }}>
+                📱 Cell Codes
+            </h2>
             <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                 {cell_codes.map((cellCode) => (
                     <li
@@ -217,14 +252,17 @@ const CellCodeList: React.FC = () => {
                             border: "1px solid rgba(255,255,255,0.2)",
                         }}
                     >
-                        <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                        <div
+                            style={{ fontWeight: "bold", marginBottom: "5px" }}
+                        >
                             {cellCode.code}
                         </div>
                         <div style={{ fontSize: "14px", opacity: 0.9 }}>
                             {cellCode.description}
                         </div>
                         <div style={{ fontSize: "12px", opacity: 0.8 }}>
-                            Status: {cellCode.isActive ? "✅ Active" : "❌ Inactive"}
+                            Status:{" "}
+                            {cellCode.isActive ? "✅ Active" : "❌ Inactive"}
                         </div>
                     </li>
                 ))}
@@ -613,23 +651,20 @@ const DataListenerExample: React.FC = () => {
     const [userEvents, setUserEvents] = React.useState<any[]>([]);
     const [productEvents, setProductEvents] = React.useState<any[]>([]);
 
-    // Слушаем изменения пользователей
     useUserListener((events) => {
         setUserEvents((prev) => [...prev, ...events]);
     });
 
-    // Слушаем изменения продуктов
     useProductListener((events) => {
         setProductEvents((prev) => [...prev, ...events]);
     });
 
-    // Пример слушания всех типов изменений через универсальный хук
     useDataListener(
         (events) => {
-            events.forEach(() => {}); // Используем пустую функцию
+            events.forEach(() => {});
         },
         { types: ["user", "product"] }
-    ); // Слушаем и пользователей, и продукты
+    );
 
     const clearEvents = () => {
         setUserEvents([]);
@@ -781,14 +816,10 @@ const DataListenerExample: React.FC = () => {
     );
 };
 
-// Компонент для демонстрации хуков связанных данных
 const RelatedHooksExample: React.FC = () => {
-    // Используем метод getRelated через хуки
-    // Получаем связанные продукты для пользователя с ID 1
     const userFavoriteProducts = useUserRelated(1, "product");
     const userOwnedProducts = useUserRelated(1, "product");
 
-    // Получаем связанных пользователей для продукта с ID 1
     const productOwner = useProductRelated(1, "user");
     const productPurchasers = useProductRelated(1, "user");
 
@@ -990,7 +1021,6 @@ const RelatedHooksExample: React.FC = () => {
     );
 };
 
-// Компонент для демонстрации полных связанных данных
 const FullRelatedDataExample: React.FC = () => {
     const userFullData = useUserFullRelatedData(1);
     const productFullData = useProductFullRelatedData(1);
@@ -1278,59 +1308,60 @@ const FullRelatedDataExample: React.FC = () => {
     );
 };
 
-// Главный компонент приложения
 const App: React.FC = () => {
     return (
-        <RpcProvider repository={configuredRepository} store={store}>
-            <div
-                style={{
-                    minHeight: "100vh",
-                    background:
-                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    padding: "20px",
-                    fontFamily:
-                        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                }}
-            >
+        <Provider store={extendedStore}>
+            <RpcProvider repository={configuredRepository}>
                 <div
                     style={{
-                        maxWidth: "1200px",
-                        margin: "0 auto",
+                        minHeight: "100vh",
+                        background:
+                            "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        padding: "20px",
+                        fontFamily:
+                            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                     }}
                 >
-                    <h1
-                        style={{
-                            textAlign: "center",
-                            color: "white",
-                            fontSize: "36px",
-                            margin: "0 0 30px 0",
-                            textShadow: "2px 2px 4px rgba(0,0,0,0.3)",
-                        }}
-                    >
-                        🚀 Auto-Generated Hooks Example
-                    </h1>
-
                     <div
                         style={{
-                            display: "flex",
-                            gap: "2rem",
-                            flexWrap: "wrap",
-                            justifyContent: "center",
+                            maxWidth: "1200px",
+                            margin: "0 auto",
                         }}
                     >
-                        <UsersList />
-                        <ProductsList />
-                        <CellCodeList />
-                    </div>
+                        <h1
+                            style={{
+                                textAlign: "center",
+                                color: "white",
+                                fontSize: "36px",
+                                margin: "0 0 30px 0",
+                                textShadow: "2px 2px 4px rgba(0,0,0,0.3)",
+                            }}
+                        >
+                            🚀 Auto-Generated Hooks Example
+                        </h1>
 
-                    <ItemDetails />
-                    <RelatedDataExample />
-                    <RelatedHooksExample />
-                    <DataListenerExample />
-                    <FullRelatedDataExample />
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: "2rem",
+                                flexWrap: "wrap",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <UsersList />
+                            <ProductsList />
+                            <CellCodeList />
+                        </div>
+
+                        <ItemDetails />
+                        <RelatedDataExample />
+                        <RelatedHooksExample />
+                        <DataListenerExample />
+                        <FullRelatedDataExample />
+                    </div>
                 </div>
-            </div>
-        </RpcProvider>
+            </RpcProvider>
+        </Provider>
     );
 };
 

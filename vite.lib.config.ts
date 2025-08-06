@@ -26,17 +26,8 @@ export default defineConfig({
                 "@reduxjs/toolkit",
                 "@yunu-lab/rpc-ts",
                 "zod",
+                "react/jsx-runtime",
             ],
-            output: {
-                globals: {
-                    react: "React",
-                    "react-dom": "ReactDOM",
-                    "react-redux": "ReactRedux",
-                    "@reduxjs/toolkit": "ReduxToolkit",
-                    "@yunu-lab/rpc-ts": "RpcTs",
-                    zod: "zod",
-                },
-            },
         },
         sourcemap: true,
         minify: false,

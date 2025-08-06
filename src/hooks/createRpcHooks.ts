@@ -66,12 +66,15 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
         targetType: TTarget
     ) => Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>;
 } & {
-    useHandleMessages: (
-        messages: Array<{
-            type: keyof TTypes;
-            payload: InferRpcType<TTypes[keyof TTypes]>[];
-        }>
-    ) => void;
+    useHandleMessages: () => {
+        handleMessages: (
+            messages: Array<{
+                type: keyof TTypes;
+                payload: InferRpcType<TTypes[keyof TTypes]>[];
+            }>,
+            callbacks?: { [K in keyof TTypes]: (data: any) => void }
+        ) => void;
+    };
 };
 
 export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(

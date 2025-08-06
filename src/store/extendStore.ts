@@ -10,10 +10,11 @@ import { RpcRepository } from "@yunu-lab/rpc-ts";
 export interface ExtendStoreOptions {
     repository: RpcRepository<any>;
     store: Store;
+    slices?: Record<string, any>;
 }
 
 export const extendStore = (options: ExtendStoreOptions) => {
-    const { repository, store } = options;
+    const { repository, store, slices = {} } = options;
 
     const rpcSlice = createSlice({
         name: "rpc",
@@ -32,34 +33,12 @@ export const extendStore = (options: ExtendStoreOptions) => {
         },
     });
 
-    const storeWithAsync = store as Store & {
-        asyncReducers?: Record<string, any>;
-        injectReducer?: (key: string, reducer: any) => void;
-    };
+    const newReducer = combineReducers({
+        ...slices,
+        rpc: rpcSlice.reducer,
+    });
 
-    if (storeWithAsync.injectReducer) {
-        storeWithAsync.injectReducer("rpc", rpcSlice.reducer);
-    } else {
-        storeWithAsync.asyncReducers = storeWithAsync.asyncReducers || {};
-        storeWithAsync.asyncReducers.rpc = rpcSlice.reducer;
-
-        storeWithAsync.injectReducer = (key: string, asyncReducer: any) => {
-            storeWithAsync.asyncReducers![key] = asyncReducer;
-            const currentState = store.getState();
-            const newReducer = combineReducers({
-                ...currentState,
-                ...storeWithAsync.asyncReducers,
-            });
-            store.replaceReducer(newReducer);
-        };
-
-        const currentState = store.getState();
-        const newReducer = combineReducers({
-            ...currentState,
-            ...storeWithAsync.asyncReducers,
-        });
-        store.replaceReducer(newReducer);
-    }
+    store.replaceReducer(newReducer);
 
     const unsubscribe = repository.onDataChanged((events) => {
         events.forEach((event) => {

@@ -2,7 +2,7 @@
 import { RepositoryTypes, Rpc, RpcRepository } from "@yunu-lab/rpc-ts";
 import React from "react";
 import { z } from "zod";
-import { Provider } from "react-redux";
+import { Provider, useSelector, useDispatch } from "react-redux";
 import { createRpcHooks } from "../hooks/createRpcHooks";
 import { RpcProvider } from "../providers/RpcStoreProvider";
 import { extendStore } from "../store/extendStore";
@@ -177,32 +177,74 @@ setTimeout(() => {
 // 1. Пользователь создает свой store с Redux Toolkit
 import { configureStore, createSlice } from "@reduxjs/toolkit";
 
-// Пользовательские reducers
+// Пользовательские slice'ы
 const userSlice = createSlice({
     name: "user",
     initialState: { currentUser: null },
     reducers: {
-        setCurrentUser: (state: any, action: any) => {
+        setCurrentUser: (state, action) => {
             state.currentUser = action.payload;
         },
     },
 });
 
-// Пользовательский store
-const userStore = configureStore({
-    reducer: {
-        user: userSlice.reducer,
+const cartSlice = createSlice({
+    name: "cart",
+    initialState: { items: [] as any[], total: 0 },
+    reducers: {
+        addToCart: (
+            state,
+            action: { payload: { id: number; name: string; price: number } }
+        ) => {
+            state.items.push(action.payload);
+            state.total += action.payload.price;
+        },
+        removeFromCart: (state, action: { payload: { id: number } }) => {
+            const index = state.items.findIndex(
+                (item) => item.id === action.payload.id
+            );
+            if (index > -1) {
+                state.total -= state.items[index].price;
+                state.items.splice(index, 1);
+            }
+        },
     },
 });
 
-// 2. Расширяем существующий store RPC функциональностью
+const themeSlice = createSlice({
+    name: "theme",
+    initialState: { mode: "light" },
+    reducers: {
+        toggleTheme: (state: any) => {
+            state.mode = state.mode === "light" ? "dark" : "light";
+        },
+    },
+});
+
+// Пользовательский store с несколькими slice'ами
+const userStore = configureStore({
+    reducer: {
+        user: userSlice.reducer,
+        cart: cartSlice.reducer,
+        theme: themeSlice.reducer,
+    },
+});
+
+// Расширяем существующий store RPC функциональностью
 const { store: extendedStore, repository: configuredRepository } = extendStore({
     repository,
     store: userStore,
+    slices: {
+        user: userSlice.reducer,
+        cart: cartSlice.reducer,
+        theme: themeSlice.reducer,
+    },
 });
 
 // Теперь extendedStore содержит:
 // - user: { currentUser: null } (пользовательский reducer)
+// - cart: { items: [], total: 0 } (корзина)
+// - theme: { mode: "light" } (тема)
 // - rpc: { user: {...}, product: {...} } (RPC reducer)
 
 const {
@@ -217,10 +259,10 @@ const {
     useProductRelated,
     useCellCode,
 } = createRpcHooks<RepositoryTypes<typeof repository>>([
+    "cell_code",
+    "user",
     "product",
     "rectangle",
-    "user",
-    "cell_code",
 ]);
 
 // Компонент для работы с cell_code (демонстрация snake_case -> camelCase)
@@ -1308,6 +1350,241 @@ const FullRelatedDataExample: React.FC = () => {
     );
 };
 
+// Компоненты для демонстрации работы с другими slice'ами
+const CartExample: React.FC = () => {
+    const cart = useSelector((state: any) => state.cart);
+    const dispatch = useDispatch();
+
+    const addSampleItem = () => {
+        dispatch(
+            cartSlice.actions.addToCart({
+                id: Date.now(),
+                name: "Sample Product",
+                price: Math.floor(Math.random() * 100) + 10,
+            })
+        );
+    };
+
+    const removeItem = (id: number) => {
+        dispatch(cartSlice.actions.removeFromCart({ id }));
+    };
+
+    return (
+        <div
+            style={{
+                background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+                padding: "20px",
+                borderRadius: "12px",
+                color: "white",
+                marginTop: "20px",
+            }}
+        >
+            <h3 style={{ margin: "0 0 15px 0", fontSize: "20px" }}>
+                🛒 Cart Example (Redux Slice)
+            </h3>
+            <div style={{ marginBottom: "15px" }}>
+                <button
+                    onClick={addSampleItem}
+                    style={{
+                        background: "rgba(255,255,255,0.2)",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        color: "white",
+                        padding: "8px 16px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        marginRight: "10px",
+                    }}
+                >
+                    Add Item
+                </button>
+                <span style={{ fontSize: "16px", fontWeight: "bold" }}>
+                    Total: ${cart.total}
+                </span>
+            </div>
+            <div>
+                {cart.items.map((item: any) => (
+                    <div
+                        key={item.id}
+                        style={{
+                            background: "rgba(255,255,255,0.1)",
+                            padding: "10px",
+                            margin: "5px 0",
+                            borderRadius: "6px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                        }}
+                    >
+                        <span>
+                            {item.name} - ${item.price}
+                        </span>
+                        <button
+                            onClick={() => removeItem(item.id)}
+                            style={{
+                                background: "rgba(255,0,0,0.3)",
+                                border: "1px solid rgba(255,0,0,0.5)",
+                                color: "white",
+                                padding: "4px 8px",
+                                borderRadius: "4px",
+                                cursor: "pointer",
+                            }}
+                        >
+                            Remove
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const ThemeExample: React.FC = () => {
+    const theme = useSelector((state: any) => state.theme);
+    const dispatch = useDispatch();
+
+    return (
+        <div
+            style={{
+                background: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+                padding: "20px",
+                borderRadius: "12px",
+                color: "white",
+                marginTop: "20px",
+            }}
+        >
+            <h3 style={{ margin: "0 0 15px 0", fontSize: "20px" }}>
+                🎨 Theme Example (Redux Slice)
+            </h3>
+            <div style={{ marginBottom: "15px" }}>
+                <span style={{ fontSize: "16px", marginRight: "15px" }}>
+                    Current Theme: {theme.mode}
+                </span>
+                <button
+                    onClick={() =>
+                        (dispatch as any)(themeSlice.actions.toggleTheme())
+                    }
+                    style={{
+                        background: "rgba(255,255,255,0.2)",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        color: "white",
+                        padding: "8px 16px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                    }}
+                >
+                    Toggle Theme
+                </button>
+            </div>
+            <div
+                style={{
+                    background:
+                        theme.mode === "light"
+                            ? "rgba(255,255,255,0.9)"
+                            : "rgba(0,0,0,0.8)",
+                    color: theme.mode === "light" ? "#333" : "#fff",
+                    padding: "15px",
+                    borderRadius: "8px",
+                    border: "2px solid rgba(255,255,255,0.3)",
+                }}
+            >
+                <p style={{ margin: 0 }}>
+                    This is a preview of the {theme.mode} theme!
+                </p>
+            </div>
+        </div>
+    );
+};
+
+const UserSliceExample: React.FC = () => {
+    const user = useSelector((state: any) => state.user);
+    const dispatch = useDispatch();
+
+    const setRandomUser = () => {
+        const users = [
+            { id: 1, name: "Alice", email: "alice@example.com" },
+            { id: 2, name: "Bob", email: "bob@example.com" },
+            { id: 3, name: "Charlie", email: "charlie@example.com" },
+        ];
+        const randomUser = users[Math.floor(Math.random() * users.length)];
+        dispatch(userSlice.actions.setCurrentUser(randomUser));
+    };
+
+    return (
+        <div
+            style={{
+                background: "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
+                padding: "20px",
+                borderRadius: "12px",
+                color: "#333",
+                marginTop: "20px",
+            }}
+        >
+            <h3 style={{ margin: "0 0 15px 0", fontSize: "20px" }}>
+                👤 User Slice Example (Redux Slice)
+            </h3>
+            <div style={{ marginBottom: "15px" }}>
+                <button
+                    onClick={setRandomUser}
+                    style={{
+                        background: "rgba(0,0,0,0.1)",
+                        border: "1px solid rgba(0,0,0,0.2)",
+                        color: "#333",
+                        padding: "8px 16px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        marginRight: "10px",
+                    }}
+                >
+                    Set Random User
+                </button>
+                <button
+                    onClick={() =>
+                        (dispatch as any)(
+                            userSlice.actions.setCurrentUser(null)
+                        )
+                    }
+                    style={{
+                        background: "rgba(255,0,0,0.1)",
+                        border: "1px solid rgba(255,0,0,0.3)",
+                        color: "#d32f2f",
+                        padding: "8px 16px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                    }}
+                >
+                    Clear User
+                </button>
+            </div>
+            <div
+                style={{
+                    background: "rgba(255,255,255,0.7)",
+                    padding: "15px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(0,0,0,0.1)",
+                }}
+            >
+                {user.currentUser ? (
+                    <div>
+                        <p>
+                            <strong>Name:</strong> {user.currentUser.name}
+                        </p>
+                        <p>
+                            <strong>Email:</strong> {user.currentUser.email}
+                        </p>
+                        <p>
+                            <strong>ID:</strong> {user.currentUser.id}
+                        </p>
+                    </div>
+                ) : (
+                    <p style={{ margin: 0, fontStyle: "italic" }}>
+                        No user selected
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const App: React.FC = () => {
     return (
         <Provider store={extendedStore}>
@@ -1358,6 +1635,10 @@ const App: React.FC = () => {
                         <RelatedHooksExample />
                         <DataListenerExample />
                         <FullRelatedDataExample />
+
+                        <CartExample />
+                        <ThemeExample />
+                        <UserSliceExample />
                     </div>
                 </div>
             </RpcProvider>

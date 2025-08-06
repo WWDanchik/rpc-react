@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { RepositoryTypes, Rpc, RpcRepository } from "@yunu-lab/rpc-ts";
 import React from "react";
+import { Provider, useDispatch, useSelector } from "react-redux";
 import { z } from "zod";
-import { Provider, useSelector, useDispatch } from "react-redux";
 import { createRpcHooks } from "../hooks/createRpcHooks";
 import { RpcProvider } from "../providers/RpcStoreProvider";
 import { extendStore } from "../store/extendStore";
@@ -175,51 +175,8 @@ setTimeout(() => {
 // ========================================
 
 // 1. Пользователь создает свой store с Redux Toolkit
-import { configureStore, createSlice } from "@reduxjs/toolkit";
-
-// Пользовательские slice'ы
-const userSlice = createSlice({
-    name: "user",
-    initialState: { currentUser: null },
-    reducers: {
-        setCurrentUser: (state, action) => {
-            state.currentUser = action.payload;
-        },
-    },
-});
-
-const cartSlice = createSlice({
-    name: "cart",
-    initialState: { items: [] as any[], total: 0 },
-    reducers: {
-        addToCart: (
-            state,
-            action: { payload: { id: number; name: string; price: number } }
-        ) => {
-            state.items.push(action.payload);
-            state.total += action.payload.price;
-        },
-        removeFromCart: (state, action: { payload: { id: number } }) => {
-            const index = state.items.findIndex(
-                (item) => item.id === action.payload.id
-            );
-            if (index > -1) {
-                state.total -= state.items[index].price;
-                state.items.splice(index, 1);
-            }
-        },
-    },
-});
-
-const themeSlice = createSlice({
-    name: "theme",
-    initialState: { mode: "light" },
-    reducers: {
-        toggleTheme: (state: any) => {
-            state.mode = state.mode === "light" ? "dark" : "light";
-        },
-    },
-});
+import { configureStore } from "@reduxjs/toolkit";
+import { cartSlice, themeSlice, userSlice } from "./slices/slices";
 
 // Пользовательский store с несколькими slice'ами
 const userStore = configureStore({
@@ -265,7 +222,6 @@ const {
     "rectangle",
 ]);
 
-// Компонент для работы с cell_code (демонстрация snake_case -> camelCase)
 const CellCodeList: React.FC = () => {
     const { cell_codes } = useCellCode();
 

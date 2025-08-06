@@ -29,6 +29,7 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
                     | Record<string, Partial<InferRpcType<TTypes[K]>> | null>
                     | InferRpcType<TTypes[K]>[]
             ) => void;
+            
         };
         (id: string | number): InferRpcType<TTypes[K]> | null;
     };
@@ -59,6 +60,13 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
         id: string | number,
         targetType: TTarget
     ) => Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>;
+} & {
+    useHandleMessages: (
+        messages: Array<{
+            type: keyof TTypes;
+            payload: InferRpcType<TTypes[keyof TTypes]>[];
+        }>
+    ) => void;
 };
 
 export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
@@ -235,6 +243,24 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         }
         (hooks as any)[relatedHookName] = useRelatedHook;
     });
+
+    // Хук для обработки сообщений
+    function useHandleMessages() {
+        const { repository } = useRpc<TTypes>();
+        
+        const handleMessages = (
+            messages: Array<{
+                type: keyof TTypes;
+                payload: InferRpcType<TTypes[keyof TTypes]>[];
+            }>
+        ) => {
+            (repository as any).handleMessages(messages);
+        };
+        
+        return handleMessages;
+    }
+    
+    (hooks as any).useHandleMessages = useHandleMessages;
 
     return hooks;
 };

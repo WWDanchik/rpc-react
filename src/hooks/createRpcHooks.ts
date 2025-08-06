@@ -2,8 +2,8 @@
 import { Rpc } from "@yunu-lab/rpc-ts";
 import React from "react";
 import { useSelector } from "react-redux";
-import { useRpc } from "./useRpc";
 import { z } from "zod";
+import { useRpc } from "./useRpc";
 
 type InferRpcType<T> = T extends Rpc<infer S> ? z.infer<S> : never;
 
@@ -29,7 +29,6 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
                     | Record<string, Partial<InferRpcType<TTypes[K]>> | null>
                     | InferRpcType<TTypes[K]>[]
             ) => void;
-            
         };
         (id: string | number): InferRpcType<TTypes[K]> | null;
     };
@@ -41,22 +40,28 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
     ) => TResult | TResult[] | null;
 } & {
     [K in keyof TTypes as `use${ToPascalCase<string & K>}Listener`]: (
-        callback: (events: Array<{
-            type: K;
-            payload: InferRpcType<TTypes[K]>[];
-        }>) => void,
+        callback: (
+            events: Array<{
+                type: K;
+                payload: InferRpcType<TTypes[K]>[];
+            }>
+        ) => void,
         options?: { types?: K[] }
     ) => () => void;
 } & {
     useDataListener: (
-        callback: (events: Array<{
-            type: keyof TTypes;
-            payload: any[];
-        }>) => void,
+        callback: (
+            events: Array<{
+                type: keyof TTypes;
+                payload: any[];
+            }>
+        ) => void,
         options?: { types?: (keyof TTypes)[] }
     ) => () => void;
 } & {
-    [K in keyof TTypes as `use${ToPascalCase<string & K>}Related`]: <TTarget extends keyof TTypes>(
+    [K in keyof TTypes as `use${ToPascalCase<string & K>}Related`]: <
+        TTarget extends keyof TTypes
+    >(
         id: string | number,
         targetType: TTarget
     ) => Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>;
@@ -74,9 +79,12 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
 ): RpcHooks<TTypes> => {
     const toPascalCase = (s: string): string => {
         return s
-            .split('_')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join('');
+            .split("_")
+            .map(
+                (word) =>
+                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            )
+            .join("");
     };
 
     const capitalize = (s: string): string =>
@@ -111,7 +119,9 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                 return findById(id);
             }
             return {
-                [`${String(typeKey)}s`]: Object.values(allData) as InferRpcType<TTypes[typeof typeKey]>[],
+                [`${String(typeKey)}s`]: Object.values(allData) as InferRpcType<
+                    TTypes[typeof typeKey]
+                >[],
                 findById,
                 findAll,
                 mergeRpc,
@@ -124,9 +134,9 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             String(typeName)
         )}FullRelatedData` as keyof RpcHooks<TTypes>;
 
-        function useFullRelatedHook<TResult = InferRpcType<TTypes[typeof typeName]>>(
-            id?: string | number
-        ) {
+        function useFullRelatedHook<
+            TResult = InferRpcType<TTypes[typeof typeName]>
+        >(id?: string | number) {
             const { repository } = useRpc<TTypes>();
             const allRpcData = useSelector(
                 (state: RpcState<TTypes>) => state.rpc
@@ -157,22 +167,26 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         const listenerHookName = `use${capitalize(
             String(typeName)
         )}Listener` as keyof RpcHooks<TTypes>;
-        
+
         function useListenerHook(
-            callback: (events: Array<{
-                type: typeof typeName;
-                payload: InferRpcType<TTypes[typeof typeName]>[];
-            }>) => void,
+            callback: (
+                events: Array<{
+                    type: typeof typeName;
+                    payload: InferRpcType<TTypes[typeof typeName]>[];
+                }>
+            ) => void,
             options?: { types?: (typeof typeName)[] }
         ) {
             const { repository } = useRpc<TTypes>();
             React.useEffect(() => {
-                const listenerId = (repository as any).onDataChanged(
-                    callback,
-                    { types: options?.types || [typeName] }
-                );
+                const listenerId = (repository as any).onDataChanged(callback, {
+                    types: options?.types || [typeName],
+                });
                 return () => {
-                    if (listenerId && typeof (repository as any).removeListener === 'function') {
+                    if (
+                        listenerId &&
+                        typeof (repository as any).removeListener === "function"
+                    ) {
                         (repository as any).removeListener(listenerId);
                     }
                 };
@@ -183,20 +197,24 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     });
 
     function useDataListener(
-        callback: (events: Array<{
-            type: keyof TTypes;
-            payload: any[];
-        }>) => void,
+        callback: (
+            events: Array<{
+                type: keyof TTypes;
+                payload: any[];
+            }>
+        ) => void,
         options?: { types?: (keyof TTypes)[] }
     ) {
         const { repository } = useRpc<TTypes>();
         React.useEffect(() => {
-            const listenerId = (repository as any).onDataChanged(
-                callback,
-                { types: options?.types || typeKeys }
-            );
+            const listenerId = (repository as any).onDataChanged(callback, {
+                types: options?.types || typeKeys,
+            });
             return () => {
-                if (listenerId && typeof (repository as any).removeListener === 'function') {
+                if (
+                    listenerId &&
+                    typeof (repository as any).removeListener === "function"
+                ) {
                     (repository as any).removeListener(listenerId);
                 }
             };
@@ -209,7 +227,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         const relatedHookName = `use${capitalize(
             String(typeName)
         )}Related` as keyof RpcHooks<TTypes>;
-        
+
         function useRelatedHook<TTarget extends keyof TTypes>(
             id: string | number,
             targetType: TTarget
@@ -221,9 +239,9 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const targetData = useSelector(
                 (state: RpcState<TTypes>) => state.rpc[targetType] || {}
             );
-            const [relatedData, setRelatedData] = React.useState<Array<
-                TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never
-            >>([]);
+            const [relatedData, setRelatedData] = React.useState<
+                Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>
+            >([]);
             React.useEffect(() => {
                 const getRelatedData = () => {
                     try {
@@ -247,19 +265,29 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     // Хук для обработки сообщений
     function useHandleMessages() {
         const { repository } = useRpc<TTypes>();
-        
+
         const handleMessages = (
             messages: Array<{
                 type: keyof TTypes;
                 payload: InferRpcType<TTypes[keyof TTypes]>[];
-            }>
+            }>,
+            callbacks?: {
+                [K in keyof TTypes]: (
+                    data:
+                        | InferRpcType<TTypes[keyof TTypes]>[]
+                        | Record<
+                              string,
+                              Partial<InferRpcType<TTypes[keyof TTypes]>> | null
+                          >
+                ) => void;
+            }
         ) => {
-            (repository as any).handleMessages(messages);
+            repository.handleMessages(messages, callbacks);
         };
-        
+
         return handleMessages;
     }
-    
+
     (hooks as any).useHandleMessages = useHandleMessages;
 
     return hooks;

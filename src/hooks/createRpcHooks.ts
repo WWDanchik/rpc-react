@@ -22,6 +22,11 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
         (): {
             [P in K as `${P & string}s`]: InferRpcType<TTypes[P]>[];
         } & {
+            [P in K as `${P & string}Map`]: Record<
+                string,
+                InferRpcType<TTypes[P]>
+            >;
+        } & {
             findById: (id: string | number) => InferRpcType<TTypes[K]> | null;
             findAll: () => InferRpcType<TTypes[K]>[];
             mergeRpc: (
@@ -294,23 +299,16 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         const handleMessages = (
             messages: Array<{
                 type: keyof TTypes;
-                payload: InferRpcType<TTypes[keyof TTypes]>[];
+                payload:
+                    | InferRpcType<TTypes[keyof TTypes]>[]
+                    | Record<string, InferRpcType<TTypes[keyof TTypes]> | null>;
             }>,
-            callbacks?: {
-                [K in keyof TTypes]: (
-                    data:
-                        | InferRpcType<TTypes[keyof TTypes]>[]
-                        | Record<
-                              string,
-                              Partial<InferRpcType<TTypes[keyof TTypes]>> | null
-                          >
-                ) => void;
-            }
+            callbacks?: { [K in keyof TTypes]: (data: any) => void }
         ) => {
             repository.handleMessages(messages, callbacks);
         };
 
-        return handleMessages;
+        return { handleMessages };
     }
 
     (hooks as any).useHandleMessages = useHandleMessages;

@@ -89,9 +89,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             .join("");
     };
 
-    const capitalize = (s: string): string =>
-        s.charAt(0).toUpperCase() + s.slice(1);
-
     const hooks = {} as RpcHooks<TTypes>;
 
     typeKeys.forEach((typeName) => {
@@ -250,7 +247,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     (hooks as any).useDataListener = useDataListener;
 
     typeKeys.forEach((typeName) => {
-        const relatedHookName = `use${capitalize(
+        const relatedHookName = `use${toPascalCase(
             String(typeName)
         )}Related` as keyof RpcHooks<TTypes>;
 

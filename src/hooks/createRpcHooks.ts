@@ -69,7 +69,9 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
         handleMessages: (
             messages: Array<{
                 type: keyof TTypes;
-                payload: InferRpcType<TTypes[keyof TTypes]>[];
+                payload:
+                    | InferRpcType<TTypes[keyof TTypes]>[]
+                    | Record<string, InferRpcType<TTypes[keyof TTypes]> | null>;
             }>,
             callbacks?: { [K in keyof TTypes]: (data: any) => void }
         ) => void;

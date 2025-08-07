@@ -172,7 +172,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         )}Listener` as keyof RpcHooks<TTypes>;
 
         function useListenerHook(
-            callback: (events: {
+            callback: (event: {
                 type: typeof typeName;
                 payload:
                     | InferRpcType<TTypes[typeof typeName]>[]

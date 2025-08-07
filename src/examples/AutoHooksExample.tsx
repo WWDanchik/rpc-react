@@ -209,7 +209,7 @@ const {
     useProduct,
     useUserFullRelatedData,
     useProductFullRelatedData,
-    useUserListener,
+
     useProductListener,
     useDataListener,
     useUserRelated,
@@ -367,6 +367,9 @@ const UsersList: React.FC = () => {
 
 // Компонент для работы с продуктами
 const ProductsList: React.FC = () => {
+    useProductListener((event) => {
+        console.log(event);
+    });
     const { products, mergeRpc } = useProduct();
 
     const handleAddProduct = () => {
@@ -648,14 +651,6 @@ const RelatedDataExample: React.FC = () => {
 const DataListenerExample: React.FC = () => {
     const [userEvents, setUserEvents] = React.useState<any[]>([]);
     const [productEvents, setProductEvents] = React.useState<any[]>([]);
-
-    useUserListener((events) => {
-        setUserEvents((prev) => [...prev, ...events]);
-    });
-
-    useProductListener((events) => {
-        setProductEvents((prev) => [...prev, ...events]);
-    });
 
     useDataListener(
         (events) => {

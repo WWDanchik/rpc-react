@@ -41,12 +41,16 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
 } & {
     [K in keyof TTypes as `use${ToPascalCase<string & K>}Listener`]: (
         callback: (
-            events: Array<{
+            event: {
                 type: K;
-                payload: InferRpcType<TTypes[K]>[];
-            }>
-        ) => void,
-        options?: { types?: K[] }
+                payload:
+                    | InferRpcType<TTypes[K]>[]
+                    | Record<
+                          string,
+                          InferRpcType<TTypes[K]> | null
+                      >;
+            }
+        ) => void
     ) => () => void;
 } & {
     useDataListener: (

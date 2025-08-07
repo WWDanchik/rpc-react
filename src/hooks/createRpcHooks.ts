@@ -172,19 +172,43 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         )}Listener` as keyof RpcHooks<TTypes>;
 
         function useListenerHook(
-            callback: (
-                events: Array<{
-                    type: typeof typeName;
-                    payload: InferRpcType<TTypes[typeof typeName]>[];
-                }>
-            ) => void,
-            options?: { types?: (typeof typeName)[] }
+            callback: (events: {
+                type: typeof typeName;
+                payload:
+                    | InferRpcType<TTypes[typeof typeName]>[]
+                    | Record<
+                          string,
+                          InferRpcType<TTypes[typeof typeName]> | null
+                      >;
+            }) => void
         ) {
             const { repository } = useRpc<TTypes>();
             React.useEffect(() => {
-                const listenerId = (repository as any).onDataChanged(callback, {
-                    types: options?.types || [typeName],
-                });
+                const filteredCallback = (
+                    events: Array<{
+                        type: typeof typeName;
+                        payload:
+                            | InferRpcType<TTypes[typeof typeName]>[]
+                            | Record<
+                                  string,
+                                  InferRpcType<TTypes[typeof typeName]> | null
+                              >;
+                    }>
+                ) => {
+                    const filteredEvents = events.filter(
+                        (event) => event.type === typeName
+                    );
+                    if (filteredEvents.length > 0) {
+                        callback(filteredEvents[0]);
+                    }
+                };
+
+                const listenerId = (repository as any).onDataChanged(
+                    filteredCallback,
+                    {
+                        types: [typeName],
+                    }
+                );
                 return () => {
                     if (
                         listenerId &&
@@ -193,7 +217,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         (repository as any).removeListener(listenerId);
                     }
                 };
-            }, [repository, callback, options?.types]);
+            }, [repository, callback]);
             return () => {};
         }
         (hooks as any)[listenerHookName] = useListenerHook;

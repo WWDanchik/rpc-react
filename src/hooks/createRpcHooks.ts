@@ -40,17 +40,12 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
     ) => TResult | TResult[] | null;
 } & {
     [K in keyof TTypes as `use${ToPascalCase<string & K>}Listener`]: (
-        callback: (
-            event: {
-                type: K;
-                payload:
-                    | InferRpcType<TTypes[K]>[]
-                    | Record<
-                          string,
-                          InferRpcType<TTypes[K]> | null
-                      >;
-            }
-        ) => void
+        callback: (event: {
+            type: K;
+            payload:
+                | InferRpcType<TTypes[K]>[]
+                | Record<string, InferRpcType<TTypes[K]> | null>;
+        }) => void
     ) => () => void;
 } & {
     useDataListener: (
@@ -171,7 +166,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     });
 
     typeKeys.forEach((typeName) => {
-        const listenerHookName = `use${capitalize(
+        const listenerHookName = `use${toPascalCase(
             String(typeName)
         )}Listener` as keyof RpcHooks<TTypes>;
 

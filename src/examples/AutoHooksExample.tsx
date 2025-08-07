@@ -46,18 +46,7 @@ const rectangleRpc = new Rpc("rectangle", rectangleSchema, "id");
 const cell_codeRpc = new Rpc("cell_code", cell_codeSchema, "id");
 
 const repository = new RpcRepository()
-    .registerRpc("user", userRpc, (id) => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({
-                    id: Number(id),
-                    name: "John Doe",
-                    email: "john.doe@example.com",
-                    age: 12,
-                });
-            }, 1000);
-        });
-    })
+    .registerRpc("user", userRpc)
     .registerRpc("product", productRpc)
     .registerRpc("rectangle", rectangleRpc)
     .registerRpc("cell_code", cell_codeRpc);

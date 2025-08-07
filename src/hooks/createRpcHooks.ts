@@ -109,17 +109,18 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const allData = useSelector(
                 (state: RpcState<TTypes>) => state.rpc[typeKey] || {}
             );
-            const findById = (id: string | number) =>
-                repository.findById(typeKey, id);
-            const findAll = () => repository.findAll(typeKey);
-            const mergeRpc = (
+            
+            const findById = React.useCallback((id: string | number) =>
+                repository.findById(typeKey, id), [repository, typeKey]);
+            const findAll = React.useCallback(() => repository.findAll(typeKey), [repository, typeKey]);
+            const mergeRpc = React.useCallback((
                 data:
                     | Record<
                           string,
                           Partial<InferRpcType<TTypes[typeof typeKey]>> | null
                       >
                     | InferRpcType<TTypes[typeof typeKey]>[]
-            ) => repository.mergeRpc(typeKey, data);
+            ) => repository.mergeRpc(typeKey, data), [repository, typeKey]);
 
             if (id !== undefined) {
                 return findById(id);
@@ -163,7 +164,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     }
                 };
                 getData();
-            }, [repository, id, allRpcData]);
+            }, [repository, id, JSON.stringify(allRpcData)]);
             return fullData;
         }
         (hooks as any)[fullRelatedHookName] = useFullRelatedHook;
@@ -186,6 +187,9 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             }) => void
         ) {
             const { repository } = useRpc<TTypes>();
+            const callbackRef = React.useRef(callback);
+            callbackRef.current = callback;
+            
             React.useEffect(() => {
                 const filteredCallback = (
                     events: Array<{
@@ -202,7 +206,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         (event) => event.type === typeName
                     );
                     if (filteredEvents.length > 0) {
-                        callback(filteredEvents[0]);
+                        callbackRef.current(filteredEvents[0]);
                     }
                 };
 
@@ -220,7 +224,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         (repository as any).removeListener(listenerId);
                     }
                 };
-            }, [repository, callback]);
+            }, [repository]);
             return () => {};
         }
         (hooks as any)[listenerHookName] = useListenerHook;
@@ -236,8 +240,11 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         options?: { types?: (keyof TTypes)[] }
     ) {
         const { repository } = useRpc<TTypes>();
+        const callbackRef = React.useRef(callback);
+        callbackRef.current = callback;
+        
         React.useEffect(() => {
-            const listenerId = (repository as any).onDataChanged(callback, {
+            const listenerId = (repository as any).onDataChanged(callbackRef.current, {
                 types: options?.types || typeKeys,
             });
             return () => {
@@ -248,7 +255,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     (repository as any).removeListener(listenerId);
                 }
             };
-        }, [repository, callback, options?.types]);
+        }, [repository, options?.types]);
         return () => {};
     }
     (hooks as any).useDataListener = useDataListener;
@@ -286,7 +293,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     }
                 };
                 getRelatedData();
-            }, [repository, id, targetType, sourceData, targetData]);
+            }, [repository, id, targetType, JSON.stringify(sourceData), JSON.stringify(targetData)]);
             return relatedData;
         }
         (hooks as any)[relatedHookName] = useRelatedHook;

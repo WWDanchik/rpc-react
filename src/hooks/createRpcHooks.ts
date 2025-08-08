@@ -213,10 +213,13 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const [fullData, setFullData] = React.useState<
                 TResult | TResult[] | null
             >(null);
-            
+
             // Стабилизируем данные с помощью useMemo
-            const allRpcDataString = React.useMemo(() => JSON.stringify(allRpcData), [allRpcData]);
-            
+            const allRpcDataString = React.useMemo(
+                () => JSON.stringify(allRpcData),
+                [allRpcData]
+            );
+
             const getData = React.useCallback(() => {
                 try {
                     const result = (repository as any).getFullRelatedData(
@@ -228,9 +231,14 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     setFullData(null);
                 }
             }, [repository, typeName, id]);
-            
+
             React.useEffect(() => {
-                console.log(`[${String(typeName)}FullRelatedData] Fetching full related data for id:`, id);
+                console.log(
+                    `[${String(
+                        typeName
+                    )}FullRelatedData] Fetching full related data for id:`,
+                    id
+                );
                 getData();
             }, [getData, allRpcDataString]);
             return fullData;
@@ -265,28 +273,52 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const isSubscribedRef = React.useRef(false);
             callbackRef.current = callback;
 
-            const filteredCallback = React.useCallback((
-                events: Array<{
-                    type: typeof typeName;
-                    payload: any;
-                }>
-            ) => {
-                console.log(`[${String(typeName)}Listener] Received events:`, events.length);
-                const filteredEvents = events.filter(
-                    (event) => event.type === typeName
-                );
-                if (filteredEvents.length > 0) {
-                    console.log(`[${String(typeName)}Listener] Calling callback with:`, filteredEvents[0]);
-                    callbackRef.current(filteredEvents[0] as any);
-                }
-            }, [typeName]);
+            const filteredCallback = React.useCallback(
+                (
+                    events: Array<{
+                        type: typeof typeName;
+                        payload: any;
+                    }>
+                ) => {
+                    console.log(
+                        `[${String(typeName)}Listener] Received events:`,
+                        events.length
+                    );
+                    const filteredEvents = events.filter(
+                        (event) => event.type === typeName
+                    );
+                    if (filteredEvents.length > 0) {
+                        console.log(
+                            `[${String(
+                                typeName
+                            )}Listener] Calling callback with:`,
+                            filteredEvents[0]
+                        );
+                        callbackRef.current(filteredEvents[0] as any);
+                    }
+                },
+                []
+            );
 
             React.useEffect(() => {
-                console.log(`[${String(typeName)}Listener] Setting up listener, isSubscribed:`, isSubscribedRef.current);
-                
+                console.log(
+                    `[${String(
+                        typeName
+                    )}Listener] Setting up listener, isSubscribed:`,
+                    isSubscribedRef.current
+                );
+
                 // Удаляем предыдущую подписку если есть
-                if (listenerIdRef.current && typeof (repository as any).offDataChanged === "function") {
-                    console.log(`[${String(typeName)}Listener] Removing previous listener:`, listenerIdRef.current);
+                if (
+                    listenerIdRef.current &&
+                    typeof (repository as any).offDataChanged === "function"
+                ) {
+                    console.log(
+                        `[${String(
+                            typeName
+                        )}Listener] Removing previous listener:`,
+                        listenerIdRef.current
+                    );
                     (repository as any).offDataChanged(listenerIdRef.current);
                     listenerIdRef.current = null;
                     isSubscribedRef.current = false;
@@ -300,7 +332,10 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         }
                     );
                     isSubscribedRef.current = true;
-                    console.log(`[${String(typeName)}Listener] Created new listener:`, listenerIdRef.current);
+                    console.log(
+                        `[${String(typeName)}Listener] Created new listener:`,
+                        listenerIdRef.current
+                    );
                 }
 
                 return () => {
@@ -308,13 +343,20 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         listenerIdRef.current &&
                         typeof (repository as any).offDataChanged === "function"
                     ) {
-                        console.log(`[${String(typeName)}Listener] Cleaning up listener:`, listenerIdRef.current);
-                        (repository as any).offDataChanged(listenerIdRef.current);
+                        console.log(
+                            `[${String(
+                                typeName
+                            )}Listener] Cleaning up listener:`,
+                            listenerIdRef.current
+                        );
+                        (repository as any).offDataChanged(
+                            listenerIdRef.current
+                        );
                         listenerIdRef.current = null;
                         isSubscribedRef.current = false;
                     }
                 };
-            }, [repository, typeName, filteredCallback]);
+            }, [repository, filteredCallback]);
             return () => {};
         }
         (hooks as any)[listenerHookName] = useListenerHook;
@@ -346,7 +388,10 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
 
         React.useEffect(() => {
             // Удаляем предыдущую подписку если есть
-            if (listenerIdRef.current && typeof (repository as any).offDataChanged === "function") {
+            if (
+                listenerIdRef.current &&
+                typeof (repository as any).offDataChanged === "function"
+            ) {
                 (repository as any).offDataChanged(listenerIdRef.current);
                 listenerIdRef.current = null;
             }
@@ -391,11 +436,17 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const [relatedData, setRelatedData] = React.useState<
                 Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>
             >([]);
-            
+
             // Стабилизируем данные с помощью useMemo
-            const sourceDataString = React.useMemo(() => JSON.stringify(sourceData), [sourceData]);
-            const targetDataString = React.useMemo(() => JSON.stringify(targetData), [targetData]);
-            
+            const sourceDataString = React.useMemo(
+                () => JSON.stringify(sourceData),
+                [sourceData]
+            );
+            const targetDataString = React.useMemo(
+                () => JSON.stringify(targetData),
+                [targetData]
+            );
+
             const getRelatedData = React.useCallback(() => {
                 try {
                     const result = (repository as any).getRelated(
@@ -407,15 +458,24 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                 } catch {
                     setRelatedData([]);
                 }
-            }, [repository, typeName, id, targetType]);
-            
+            }, [repository, id, targetType]);
+
             React.useEffect(() => {
-                console.log(`[${String(typeName)}Related] Fetching related data for id:`, id, 'targetType:', targetType);
+                console.log(
+                    `[${String(
+                        typeName
+                    )}Related] Fetching related data for id:`,
+                    id,
+                    "targetType:",
+                    targetType
+                );
                 getRelatedData();
             }, [
                 getRelatedData,
+                id,
                 sourceDataString,
                 targetDataString,
+                targetType,
             ]);
             return relatedData;
         }

@@ -43,22 +43,32 @@ export const extendStore = (options: ExtendStoreOptions) => {
     const unsubscribe = repository.onDataChanged((events) => {
         events.forEach((event) => {
             const { type, payload } = event;
+            const storageType = repository.getStorageType(String(type));
 
-            const dataObject = payload.reduce(
-                (acc: Record<string | number, any>, item: any) => {
-                    const id = item.id;
-                    acc[id] = item;
-                    return acc;
-                },
-                {}
-            );
+            if (storageType === "singleton") {
+                store.dispatch(
+                    rpcSlice.actions.setData({
+                        type: String(type),
+                        data: payload,
+                    })
+                );
+            } else {
+                const dataObject = payload.reduce(
+                    (acc: Record<string | number, any>, item: any) => {
+                        const id = item.id;
+                        acc[id] = item;
+                        return acc;
+                    },
+                    {}
+                );
 
-            store.dispatch(
-                rpcSlice.actions.setData({
-                    type: String(type),
-                    data: dataObject,
-                })
-            );
+                store.dispatch(
+                    rpcSlice.actions.setData({
+                        type: String(type),
+                        data: dataObject,
+                    })
+                );
+            }
         });
     });
 

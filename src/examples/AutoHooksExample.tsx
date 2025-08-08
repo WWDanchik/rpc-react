@@ -211,14 +211,7 @@ const {
     useUserRelated,
     useProductRelated,
     useCellCode,
-    useCellCodeFullRelatedData,
-    useCellCodeListener,
-    useCellCodeRelated,
-    useHandleMessages,
-    useRectangle,
-    useRectangleFullRelatedData,
-    useRectangleListener,
-    useRectangleRelated,
+
     useUserListener,
 } = createRpcHooks<RepositoryTypes<typeof repository>>([
     "cell_code",

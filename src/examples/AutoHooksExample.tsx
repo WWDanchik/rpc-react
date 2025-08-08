@@ -193,6 +193,13 @@ const { store: extendedStore, repository: configuredRepository } = extendStore({
 // - theme: { mode: "light" } (тема)
 // - rpc: { user: {...}, product: {...} } (RPC reducer)
 
+type RpcStorageType = {
+    user: "collection";
+    product: "collection";
+    rectangle: "collection";
+    cell_code: "singleton";
+};
+
 const {
     useUser,
     useProduct,
@@ -204,6 +211,15 @@ const {
     useUserRelated,
     useProductRelated,
     useCellCode,
+    useCellCodeFullRelatedData,
+    useCellCodeListener,
+    useCellCodeRelated,
+    useHandleMessages,
+    useRectangle,
+    useRectangleFullRelatedData,
+    useRectangleListener,
+    useRectangleRelated,
+    useUserListener,
 } = createRpcHooks<RepositoryTypes<typeof repository>>([
     "cell_code",
     "user",
@@ -261,7 +277,9 @@ const CellCodeList: React.FC = () => {
 // Компонент для работы с пользователями
 const UsersList: React.FC = () => {
     const { users, mergeRpc } = useUser();
-
+    useUserListener<RpcStorageType>((events) => {
+        console.log(events);
+    });
     const handleAddUser = () => {
         const id = Math.floor(Math.random() * 1000);
         mergeRpc({

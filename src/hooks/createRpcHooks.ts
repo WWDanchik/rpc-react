@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Rpc } from "@yunu-lab/rpc-ts";
+import { Message, Rpc, StorageType } from "@yunu-lab/rpc-ts";
 import React from "react";
 import { useSelector } from "react-redux";
 import { z } from "zod";
@@ -18,6 +18,7 @@ interface RpcState<TTypes extends Record<string, Rpc<any>>> {
 }
 
 type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
+    // Основные хуки для каждого типа
     [K in keyof TTypes as `use${ToPascalCase<string & K>}`]: {
         (): {
             [P in K as `${P & string}s`]: InferRpcType<TTypes[P]>[];
@@ -38,31 +39,51 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
         (id: string | number): InferRpcType<TTypes[K]> | null;
     };
 } & {
+    // Хуки для полных связанных данных
     [K in keyof TTypes as `use${ToPascalCase<string & K>}FullRelatedData`]: <
         TResult = InferRpcType<TTypes[K]>
     >(
         id?: string | number
     ) => TResult | TResult[] | null;
 } & {
-    [K in keyof TTypes as `use${ToPascalCase<string & K>}Listener`]: (
+    // Хуки для слушателей с типизацией
+    [K in keyof TTypes as `use${ToPascalCase<string & K>}Listener`]: <
+        RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
+            keyof TTypes,
+            StorageType
+        >
+    >(
         callback: (event: {
             type: K;
-            payload:
-                | InferRpcType<TTypes[K]>[]
-                | Record<string, InferRpcType<TTypes[K]> | null>;
+            payload: RpcStorageType[K] extends "collection"
+                ? Array<InferRpcType<TTypes[K]>>
+                : RpcStorageType[K] extends "singleton"
+                ? InferRpcType<TTypes[K]>
+                : Array<InferRpcType<TTypes[K]>>;
         }) => void
     ) => () => void;
 } & {
-    useDataListener: (
+    // Общий слушатель данных
+    useDataListener: <
+        RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
+            keyof TTypes,
+            StorageType
+        >
+    >(
         callback: (
             events: Array<{
                 type: keyof TTypes;
-                payload: any[];
+                payload: RpcStorageType[keyof TTypes] extends "collection"
+                    ? Array<InferRpcType<TTypes[keyof TTypes]>>
+                    : RpcStorageType[keyof TTypes] extends "singleton"
+                    ? InferRpcType<TTypes[keyof TTypes]>
+                    : Array<InferRpcType<TTypes[keyof TTypes]>>;
             }>
         ) => void,
         options?: { types?: (keyof TTypes)[] }
     ) => () => void;
 } & {
+    // Хуки для связанных данных
     [K in keyof TTypes as `use${ToPascalCase<string & K>}Related`]: <
         TTarget extends keyof TTypes
     >(
@@ -70,16 +91,41 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
         targetType: TTarget
     ) => Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>;
 } & {
+    // Хук для обработки сообщений с полной типизацией
     useHandleMessages: () => {
-        handleMessages: (
-            messages: Array<{
-                type: keyof TTypes;
-                payload:
-                    | InferRpcType<TTypes[keyof TTypes]>[]
-                    | Record<string, InferRpcType<TTypes[keyof TTypes]> | null>;
-            }>,
-            callbacks?: { [K in keyof TTypes]: (data: any) => void }
-        ) => void;
+        handleMessages(
+            messages: Array<Message<TTypes>>,
+            callbacks?: {
+                [K in keyof TTypes]?: (
+                    data:
+                        | InferRpcType<TTypes[K]>[]
+                        | Record<
+                              string,
+                              Partial<InferRpcType<TTypes[K]>> | null
+                          >
+                ) => void;
+            }
+        ): void;
+
+        handleMessages<
+            RpcStorageType extends Record<keyof TTypes, StorageType>
+        >(
+            messages: Array<Message<TTypes>>,
+            callbacks?: {
+                [K in keyof TTypes]?: (
+                    data: RpcStorageType[K] extends "collection"
+                        ?
+                              | Record<
+                                    string,
+                                    Partial<InferRpcType<TTypes[K]>> | null
+                                >
+                              | Array<InferRpcType<TTypes[K]>>
+                        : RpcStorageType[K] extends "singleton"
+                        ? Partial<InferRpcType<TTypes[K]>>
+                        : never
+                ) => void;
+            }
+        ): void;
     };
 };
 
@@ -98,6 +144,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
 
     const hooks = {} as RpcHooks<TTypes>;
 
+    // Основные хуки для каждого типа
     typeKeys.forEach((typeName) => {
         const hookName = `use${toPascalCase(
             String(typeName)
@@ -109,18 +156,28 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const allData = useSelector(
                 (state: RpcState<TTypes>) => state.rpc[typeKey] || {}
             );
-            
-            const findById = React.useCallback((id: string | number) =>
-                repository.findById(typeKey, id), [repository, typeKey]);
-            const findAll = React.useCallback(() => repository.findAll(typeKey), [repository, typeKey]);
-            const mergeRpc = React.useCallback((
-                data:
-                    | Record<
-                          string,
-                          Partial<InferRpcType<TTypes[typeof typeKey]>> | null
-                      >
-                    | InferRpcType<TTypes[typeof typeKey]>[]
-            ) => repository.mergeRpc(typeKey, data), [repository, typeKey]);
+
+            const findById = React.useCallback(
+                (id: string | number) => repository.findById(typeKey, id),
+                [repository, typeKey]
+            );
+            const findAll = React.useCallback(
+                () => repository.findAll(typeKey),
+                [repository, typeKey]
+            );
+            const mergeRpc = React.useCallback(
+                (
+                    data:
+                        | Record<
+                              string,
+                              Partial<
+                                  InferRpcType<TTypes[typeof typeKey]>
+                              > | null
+                          >
+                        | InferRpcType<TTypes[typeof typeKey]>[]
+                ) => repository.mergeRpc(typeKey, data),
+                [repository, typeKey]
+            );
 
             if (id !== undefined) {
                 return findById(id);
@@ -129,6 +186,10 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                 [`${String(typeKey)}s`]: Object.values(allData) as InferRpcType<
                     TTypes[typeof typeKey]
                 >[],
+                [`${String(typeKey)}Map`]: allData as Record<
+                    string,
+                    InferRpcType<TTypes[typeof typeKey]>
+                >,
                 findById,
                 findAll,
                 mergeRpc,
@@ -137,6 +198,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
 
         (hooks as any)[hookName] = useHook;
 
+        // Хуки для полных связанных данных
         const fullRelatedHookName = `use${toPascalCase(
             String(typeName)
         )}FullRelatedData` as keyof RpcHooks<TTypes>;
@@ -170,89 +232,119 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         (hooks as any)[fullRelatedHookName] = useFullRelatedHook;
     });
 
+    // Хуки для слушателей с типизацией
     typeKeys.forEach((typeName) => {
         const listenerHookName = `use${toPascalCase(
             String(typeName)
         )}Listener` as keyof RpcHooks<TTypes>;
 
-        function useListenerHook(
+        function useListenerHook<
+            RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
+                keyof TTypes,
+                StorageType
+            >
+        >(
             callback: (event: {
                 type: typeof typeName;
-                payload:
-                    | InferRpcType<TTypes[typeof typeName]>[]
-                    | Record<
-                          string,
-                          InferRpcType<TTypes[typeof typeName]> | null
-                      >;
+                payload: RpcStorageType[typeof typeName] extends "collection"
+                    ? Array<InferRpcType<TTypes[typeof typeName]>>
+                    : RpcStorageType[typeof typeName] extends "singleton"
+                    ? InferRpcType<TTypes[typeof typeName]>
+                    : Array<InferRpcType<TTypes[typeof typeName]>>;
             }) => void
         ) {
             const { repository } = useRpc<TTypes>();
             const callbackRef = React.useRef(callback);
+            const listenerIdRef = React.useRef<string | number | null>(null);
             callbackRef.current = callback;
-            
-            React.useEffect(() => {
-                const filteredCallback = (
-                    events: Array<{
-                        type: typeof typeName;
-                        payload:
-                            | InferRpcType<TTypes[typeof typeName]>[]
-                            | Record<
-                                  string,
-                                  InferRpcType<TTypes[typeof typeName]> | null
-                              >;
-                    }>
-                ) => {
-                    const filteredEvents = events.filter(
-                        (event) => event.type === typeName
-                    );
-                    if (filteredEvents.length > 0) {
-                        callbackRef.current(filteredEvents[0]);
-                    }
-                };
 
-                const listenerId = (repository as any).onDataChanged(
+            const filteredCallback = React.useCallback((
+                events: Array<{
+                    type: typeof typeName;
+                    payload: any;
+                }>
+            ) => {
+                const filteredEvents = events.filter(
+                    (event) => event.type === typeName
+                );
+                if (filteredEvents.length > 0) {
+                    callbackRef.current(filteredEvents[0] as any);
+                }
+            }, [typeName]);
+
+            React.useEffect(() => {
+                // Удаляем предыдущую подписку если есть
+                if (listenerIdRef.current && typeof (repository as any).offDataChanged === "function") {
+                    (repository as any).offDataChanged(listenerIdRef.current);
+                    listenerIdRef.current = null;
+                }
+
+                listenerIdRef.current = (repository as any).onDataChanged(
                     filteredCallback,
                     {
                         types: [typeName],
                     }
                 );
+
                 return () => {
                     if (
-                        listenerId &&
-                        typeof (repository as any).removeListener === "function"
+                        listenerIdRef.current &&
+                        typeof (repository as any).offDataChanged === "function"
                     ) {
-                        (repository as any).removeListener(listenerId);
+                        (repository as any).offDataChanged(listenerIdRef.current);
+                        listenerIdRef.current = null;
                     }
                 };
-            }, [repository]);
+            }, [repository, typeName, filteredCallback]);
             return () => {};
         }
         (hooks as any)[listenerHookName] = useListenerHook;
     });
 
-    function useDataListener(
+    // Общий слушатель данных с типизацией
+    function useDataListener<
+        RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
+            keyof TTypes,
+            StorageType
+        >
+    >(
         callback: (
             events: Array<{
                 type: keyof TTypes;
-                payload: any[];
+                payload: RpcStorageType[keyof TTypes] extends "collection"
+                    ? Array<InferRpcType<TTypes[keyof TTypes]>>
+                    : RpcStorageType[keyof TTypes] extends "singleton"
+                    ? InferRpcType<TTypes[keyof TTypes]>
+                    : Array<InferRpcType<TTypes[keyof TTypes]>>;
             }>
         ) => void,
         options?: { types?: (keyof TTypes)[] }
     ) {
         const { repository } = useRpc<TTypes>();
         const callbackRef = React.useRef(callback);
+        const listenerIdRef = React.useRef<string | number | null>(null);
         callbackRef.current = callback;
-        
+
         React.useEffect(() => {
-            const listenerId = (repository as any).onDataChanged(callbackRef.current, {
-                types: options?.types || typeKeys,
-            });
+            // Удаляем предыдущую подписку если есть
+            if (listenerIdRef.current && typeof (repository as any).offDataChanged === "function") {
+                (repository as any).offDataChanged(listenerIdRef.current);
+                listenerIdRef.current = null;
+            }
+
+            listenerIdRef.current = (repository as any).onDataChanged(
+                callbackRef.current as any,
+                {
+                    types: options?.types || typeKeys,
+                }
+            );
             return () => {
                 if (
-                    listenerId &&
-                    typeof (repository as any).removeListener === "function"
+                    listenerIdRef.current &&
+                    typeof (repository as any).offDataChanged === "function"
                 ) {
-                    (repository as any).removeListener(listenerId);
+                    (repository as any).offDataChanged(listenerIdRef.current);
+                    listenerIdRef.current = null;
                 }
             };
         }, [repository, options?.types]);
@@ -260,6 +352,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     }
     (hooks as any).useDataListener = useDataListener;
 
+    // Хуки для связанных данных
     typeKeys.forEach((typeName) => {
         const relatedHookName = `use${toPascalCase(
             String(typeName)
@@ -293,29 +386,61 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     }
                 };
                 getRelatedData();
-            }, [repository, id, targetType, JSON.stringify(sourceData), JSON.stringify(targetData)]);
+            }, [
+                repository,
+                id,
+                targetType,
+                JSON.stringify(sourceData),
+                JSON.stringify(targetData),
+            ]);
             return relatedData;
         }
         (hooks as any)[relatedHookName] = useRelatedHook;
     });
 
-    // Хук для обработки сообщений
+    // Хук для обработки сообщений с полной типизацией
     function useHandleMessages() {
         const { repository } = useRpc<TTypes>();
 
         const handleMessages = (
-            messages: Array<{
-                type: keyof TTypes;
-                payload:
-                    | InferRpcType<TTypes[keyof TTypes]>[]
-                    | Record<string, InferRpcType<TTypes[keyof TTypes]> | null>;
-            }>,
-            callbacks?: { [K in keyof TTypes]: (data: any) => void }
+            messages: Array<Message<TTypes>>,
+            callbacks?: {
+                [K in keyof TTypes]?: (
+                    data:
+                        | InferRpcType<TTypes[K]>[]
+                        | Record<
+                              string,
+                              Partial<InferRpcType<TTypes[K]>> | null
+                          >
+                ) => void;
+            }
         ) => {
             repository.handleMessages(messages, callbacks);
         };
 
-        return { handleMessages };
+        const handleMessagesTyped = <
+            RpcStorageType extends Record<keyof TTypes, StorageType>
+        >(
+            messages: Array<Message<TTypes>>,
+            callbacks?: {
+                [K in keyof TTypes]?: (
+                    data: RpcStorageType[K] extends "collection"
+                        ?
+                              | Record<
+                                    string,
+                                    Partial<InferRpcType<TTypes[K]>> | null
+                                >
+                              | Array<InferRpcType<TTypes[K]>>
+                        : RpcStorageType[K] extends "singleton"
+                        ? Partial<InferRpcType<TTypes[K]>>
+                        : never
+                ) => void;
+            }
+        ) => {
+            repository.handleMessages<RpcStorageType>(messages, callbacks);
+        };
+
+        return { handleMessages, handleMessagesTyped };
     }
 
     (hooks as any).useHandleMessages = useHandleMessages;

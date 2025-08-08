@@ -256,6 +256,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const { repository } = useRpc<TTypes>();
             const callbackRef = React.useRef(callback);
             const listenerIdRef = React.useRef<string | number | null>(null);
+            const isSubscribedRef = React.useRef(false);
             callbackRef.current = callback;
 
             const filteredCallback = React.useCallback((
@@ -264,35 +265,47 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     payload: any;
                 }>
             ) => {
+                console.log(`[${String(typeName)}Listener] Received events:`, events.length);
                 const filteredEvents = events.filter(
                     (event) => event.type === typeName
                 );
                 if (filteredEvents.length > 0) {
+                    console.log(`[${String(typeName)}Listener] Calling callback with:`, filteredEvents[0]);
                     callbackRef.current(filteredEvents[0] as any);
                 }
             }, [typeName]);
 
             React.useEffect(() => {
+                console.log(`[${String(typeName)}Listener] Setting up listener, isSubscribed:`, isSubscribedRef.current);
+                
                 // Удаляем предыдущую подписку если есть
                 if (listenerIdRef.current && typeof (repository as any).offDataChanged === "function") {
+                    console.log(`[${String(typeName)}Listener] Removing previous listener:`, listenerIdRef.current);
                     (repository as any).offDataChanged(listenerIdRef.current);
                     listenerIdRef.current = null;
+                    isSubscribedRef.current = false;
                 }
 
-                listenerIdRef.current = (repository as any).onDataChanged(
-                    filteredCallback,
-                    {
-                        types: [typeName],
-                    }
-                );
+                if (!isSubscribedRef.current) {
+                    listenerIdRef.current = (repository as any).onDataChanged(
+                        filteredCallback,
+                        {
+                            types: [typeName],
+                        }
+                    );
+                    isSubscribedRef.current = true;
+                    console.log(`[${String(typeName)}Listener] Created new listener:`, listenerIdRef.current);
+                }
 
                 return () => {
                     if (
                         listenerIdRef.current &&
                         typeof (repository as any).offDataChanged === "function"
                     ) {
+                        console.log(`[${String(typeName)}Listener] Cleaning up listener:`, listenerIdRef.current);
                         (repository as any).offDataChanged(listenerIdRef.current);
                         listenerIdRef.current = null;
+                        isSubscribedRef.current = false;
                     }
                 };
             }, [repository, typeName, filteredCallback]);

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useContext } from "react";
+import React, { useContext } from "react";
 import { Rpc, RpcRepository } from "@yunu-lab/rpc-ts";
 import { RpcContext } from "../providers/RpcStoreProvider";
 
@@ -16,7 +16,12 @@ export const useRpc = <
         throw new Error("useRpc must be used within an RpcProvider");
     }
 
+    const repository = React.useMemo(
+        () => context.repository as unknown as RpcRepository<TTypes>,
+        [context.repository]
+    );
+
     return {
-        repository: context.repository as unknown as RpcRepository<TTypes>
+        repository
     };
 };

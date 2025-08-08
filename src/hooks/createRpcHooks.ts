@@ -272,7 +272,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const listenerIdRef = React.useRef<string | number | null>(null);
             const isSubscribedRef = React.useRef(false);
             callbackRef.current = callback;
-
             const filteredCallback = React.useCallback(
                 (
                     events: Array<{
@@ -280,10 +279,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         payload: any;
                     }>
                 ) => {
-                    console.log(
-                        `[${String(typeName)}Listener] Received events:`,
-                        events.length
-                    );
                     const filteredEvents = events.filter(
                         (event) => event.type === typeName
                     );
@@ -295,14 +290,20 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                             )}Listener] Calling callback with:`,
                             event
                         );
-                        
+
                         // Для singleton типов payload должен быть объектом, а не массивом
-                        const storageType = (repository as any).getStorageType?.(String(typeName));
-                        if (storageType === "singleton" && Array.isArray(event.payload) && event.payload.length > 0) {
+                        const storageType = (
+                            repository as any
+                        ).getStorageType?.(String(typeName));
+                        if (
+                            storageType === "singleton" &&
+                            Array.isArray(event.payload) &&
+                            event.payload.length > 0
+                        ) {
                             // Для singleton берем первый элемент из массива
                             const singletonEvent = {
                                 ...event,
-                                payload: event.payload[0]
+                                payload: event.payload[0],
                             };
                             callbackRef.current(singletonEvent as any);
                         } else {
@@ -314,24 +315,11 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             );
 
             React.useEffect(() => {
-                console.log(
-                    `[${String(
-                        typeName
-                    )}Listener] Setting up listener, isSubscribed:`,
-                    isSubscribedRef.current
-                );
-
                 // Удаляем предыдущую подписку если есть
                 if (
                     listenerIdRef.current &&
                     typeof (repository as any).offDataChanged === "function"
                 ) {
-                    console.log(
-                        `[${String(
-                            typeName
-                        )}Listener] Removing previous listener:`,
-                        listenerIdRef.current
-                    );
                     (repository as any).offDataChanged(listenerIdRef.current);
                     listenerIdRef.current = null;
                     isSubscribedRef.current = false;
@@ -345,10 +333,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         }
                     );
                     isSubscribedRef.current = true;
-                    console.log(
-                        `[${String(typeName)}Listener] Created new listener:`,
-                        listenerIdRef.current
-                    );
                 }
 
                 return () => {
@@ -356,12 +340,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         listenerIdRef.current &&
                         typeof (repository as any).offDataChanged === "function"
                     ) {
-                        console.log(
-                            `[${String(
-                                typeName
-                            )}Listener] Cleaning up listener:`,
-                            listenerIdRef.current
-                        );
                         (repository as any).offDataChanged(
                             listenerIdRef.current
                         );
@@ -375,7 +353,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         (hooks as any)[listenerHookName] = useListenerHook;
     });
 
-    // Общий слушатель данных с типизацией
     function useDataListener<
         RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
             keyof TTypes,

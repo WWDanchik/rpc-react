@@ -93,20 +93,6 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
 } & {
     // Хук для обработки сообщений с полной типизацией
     useHandleMessages: () => {
-        handleMessages(
-            messages: Array<Message<TTypes>>,
-            callbacks?: {
-                [K in keyof TTypes]?: (
-                    data:
-                        | InferRpcType<TTypes[K]>[]
-                        | Record<
-                              string,
-                              Partial<InferRpcType<TTypes[K]>> | null
-                          >
-                ) => void;
-            }
-        ): void;
-
         handleMessages<
             RpcStorageType extends Record<keyof TTypes, StorageType>
         >(

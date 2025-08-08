@@ -42,6 +42,11 @@ export const extendStore = (options: ExtendStoreOptions) => {
 
     const unsubscribe = repository.onDataChanged((events) => {
         events.forEach((event) => {
+            console.log(
+                event,
+                "--------------------------------events-----------------------"
+            );
+
             const { type, payload } = event;
             const storageType = repository.getStorageType(String(type));
 

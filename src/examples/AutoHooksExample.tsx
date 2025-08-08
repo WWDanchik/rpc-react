@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { RepositoryTypes, Rpc, RpcRepository } from "@yunu-lab/rpc-ts";
+import {
+    MessageWithStorageType,
+    RepositoryTypes,
+    Rpc,
+    RpcRepository,
+} from "@yunu-lab/rpc-ts";
 import React from "react";
 import { Provider, useDispatch, useSelector } from "react-redux";
 import { z } from "zod";
@@ -226,6 +231,7 @@ const {
     useUserListener,
 
     useErrorListener,
+    useHandleMessages,
 } = createRpcHooks<RepositoryTypes<typeof repository>>([
     "cell_code",
     "user",
@@ -666,7 +672,7 @@ const DataListenerExample: React.FC = () => {
     const [userEvents, setUserEvents] = React.useState<any[]>([]);
     const [productEvents, setProductEvents] = React.useState<any[]>([]);
     const [error, setError] = React.useState<string | null>(null);
-
+    const { handleMessages } = useHandleMessages();
     useDataListener(
         (events) => {
             events.forEach(() => {});
@@ -679,10 +685,17 @@ const DataListenerExample: React.FC = () => {
         console.log("Error received:", errorData);
         console.log("Error payload:", errorData.payload);
         console.log("Error payload type:", typeof errorData.payload);
-        console.log("Error payload is array:", Array.isArray(errorData.payload));
-        
+        console.log(
+            "Error payload is array:",
+            Array.isArray(errorData.payload)
+        );
+
         // Для singleton payload это объект, а не массив
-        if (errorData.payload && typeof errorData.payload === 'object' && !Array.isArray(errorData.payload)) {
+        if (
+            errorData.payload &&
+            typeof errorData.payload === "object" &&
+            !Array.isArray(errorData.payload)
+        ) {
             setError(errorData.payload.msg);
         } else {
             console.error("Unexpected payload format:", errorData.payload);
@@ -696,19 +709,21 @@ const DataListenerExample: React.FC = () => {
     };
 
     const testError = () => {
-        (repository as any).handleMessages([
+        const messages: Array<
+            MessageWithStorageType<
+                RepositoryTypes<typeof repository>,
+                RpcStorageType
+            >
+        > = [
             {
                 type: "error",
-                payload: [
-                    {
-                        code: "TEST_ERROR",
-                        msg: "Это тестовая ошибка для проверки useErrorListener!",
-                        tech_msg: "Technical details here",
-                        text_code: "TEST_001"
-                    }
-                ]
-            }
-        ]);
+                payload: {
+                    code: "AUTHENTICATION_ERROR",
+                    msg: "Обновленная ошибка аутентификации",
+                },
+            },
+        ];
+        handleMessages(messages as any);
     };
 
     return (
@@ -742,7 +757,7 @@ const DataListenerExample: React.FC = () => {
             <h3 style={{ margin: "0 0 20px 0", fontSize: "24px" }}>
                 👂 Data Change Listeners
             </h3>
-            
+
             <div style={{ marginBottom: "20px" }}>
                 <button
                     onClick={testError}

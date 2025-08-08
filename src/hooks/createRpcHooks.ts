@@ -213,20 +213,26 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const [fullData, setFullData] = React.useState<
                 TResult | TResult[] | null
             >(null);
+            
+            // Стабилизируем данные с помощью useMemo
+            const allRpcDataString = React.useMemo(() => JSON.stringify(allRpcData), [allRpcData]);
+            
+            const getData = React.useCallback(() => {
+                try {
+                    const result = (repository as any).getFullRelatedData(
+                        typeName,
+                        id
+                    ) as TResult | TResult[] | null;
+                    setFullData(result);
+                } catch {
+                    setFullData(null);
+                }
+            }, [repository, typeName, id]);
+            
             React.useEffect(() => {
-                const getData = () => {
-                    try {
-                        const result = (repository as any).getFullRelatedData(
-                            typeName,
-                            id
-                        ) as TResult | TResult[] | null;
-                        setFullData(result);
-                    } catch {
-                        setFullData(null);
-                    }
-                };
+                console.log(`[${String(typeName)}FullRelatedData] Fetching full related data for id:`, id);
                 getData();
-            }, [repository, id, JSON.stringify(allRpcData)]);
+            }, [getData, allRpcDataString]);
             return fullData;
         }
         (hooks as any)[fullRelatedHookName] = useFullRelatedHook;
@@ -385,26 +391,31 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const [relatedData, setRelatedData] = React.useState<
                 Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>
             >([]);
+            
+            // Стабилизируем данные с помощью useMemo
+            const sourceDataString = React.useMemo(() => JSON.stringify(sourceData), [sourceData]);
+            const targetDataString = React.useMemo(() => JSON.stringify(targetData), [targetData]);
+            
+            const getRelatedData = React.useCallback(() => {
+                try {
+                    const result = (repository as any).getRelated(
+                        typeName,
+                        id,
+                        targetType
+                    );
+                    setRelatedData(result);
+                } catch {
+                    setRelatedData([]);
+                }
+            }, [repository, typeName, id, targetType]);
+            
             React.useEffect(() => {
-                const getRelatedData = () => {
-                    try {
-                        const result = (repository as any).getRelated(
-                            typeName,
-                            id,
-                            targetType
-                        );
-                        setRelatedData(result);
-                    } catch {
-                        setRelatedData([]);
-                    }
-                };
+                console.log(`[${String(typeName)}Related] Fetching related data for id:`, id, 'targetType:', targetType);
                 getRelatedData();
             }, [
-                repository,
-                id,
-                targetType,
-                JSON.stringify(sourceData),
-                JSON.stringify(targetData),
+                getRelatedData,
+                sourceDataString,
+                targetDataString,
             ]);
             return relatedData;
         }

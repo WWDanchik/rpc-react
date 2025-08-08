@@ -40,16 +40,26 @@ const cell_codeSchema = z.object({
     isActive: z.boolean(),
 });
 
+const errorSchema = z.object({
+    code: z.string(),
+    msg: z.string(),
+    tech_msg: z.string().optional(),
+    text_code: z.string().optional(),
+});
+
+const errorRpc = new Rpc("error", errorSchema, "code");
+
 const userRpc = new Rpc("user", userSchema, "id");
 const productRpc = new Rpc("product", productSchema, "id");
 const rectangleRpc = new Rpc("rectangle", rectangleSchema, "id");
 const cell_codeRpc = new Rpc("cell_code", cell_codeSchema, "id");
 
 const repository = new RpcRepository()
-    .registerRpc("user", userRpc)
-    .registerRpc("product", productRpc)
-    .registerRpc("rectangle", rectangleRpc)
-    .registerRpc("cell_code", cell_codeRpc);
+    .registerRpc("user", userRpc, { storageType: "collection" })
+    .registerRpc("product", productRpc, { storageType: "singleton" })
+    .registerRpc("rectangle", rectangleRpc, { storageType: "collection" })
+    .registerRpc("cell_code", cell_codeRpc, { storageType: "collection" })
+    .registerRpc("error", errorRpc, { storageType: "singleton" });
 
 repository.defineRelation("user", "product", "ownedProducts").hasMany(
     {
@@ -195,9 +205,10 @@ const { store: extendedStore, repository: configuredRepository } = extendStore({
 
 type RpcStorageType = {
     user: "collection";
-    product: "collection";
+    product: "singleton";
     rectangle: "collection";
-    cell_code: "singleton";
+    cell_code: "collection";
+    error: "singleton";
 };
 
 const {
@@ -213,11 +224,14 @@ const {
     useCellCode,
 
     useUserListener,
+
+    useErrorListener,
 } = createRpcHooks<RepositoryTypes<typeof repository>>([
     "cell_code",
     "user",
     "product",
     "rectangle",
+    "error",
 ]);
 
 const CellCodeList: React.FC = () => {
@@ -651,6 +665,7 @@ const RelatedDataExample: React.FC = () => {
 const DataListenerExample: React.FC = () => {
     const [userEvents, setUserEvents] = React.useState<any[]>([]);
     const [productEvents, setProductEvents] = React.useState<any[]>([]);
+    const [error, setError] = React.useState<string | null>(null);
 
     useDataListener(
         (events) => {
@@ -659,9 +674,41 @@ const DataListenerExample: React.FC = () => {
         { types: ["user", "product"] }
     );
 
+    // Пример использования useErrorListener для singleton
+    useErrorListener<RpcStorageType>((errorData) => {
+        console.log("Error received:", errorData);
+        console.log("Error payload:", errorData.payload);
+        console.log("Error payload type:", typeof errorData.payload);
+        console.log("Error payload is array:", Array.isArray(errorData.payload));
+        
+        // Для singleton payload это объект, а не массив
+        if (errorData.payload && typeof errorData.payload === 'object' && !Array.isArray(errorData.payload)) {
+            setError(errorData.payload.msg);
+        } else {
+            console.error("Unexpected payload format:", errorData.payload);
+        }
+    });
+
     const clearEvents = () => {
         setUserEvents([]);
         setProductEvents([]);
+        setError(null);
+    };
+
+    const testError = () => {
+        (repository as any).handleMessages([
+            {
+                type: "error",
+                payload: [
+                    {
+                        code: "TEST_ERROR",
+                        msg: "Это тестовая ошибка для проверки useErrorListener!",
+                        tech_msg: "Technical details here",
+                        text_code: "TEST_001"
+                    }
+                ]
+            }
+        ]);
     };
 
     return (
@@ -674,9 +721,59 @@ const DataListenerExample: React.FC = () => {
                 marginTop: "20px",
             }}
         >
+            {error && (
+                <div
+                    style={{
+                        background: "rgba(255,0,0,0.1)",
+                        padding: "15px",
+                        borderRadius: "8px",
+                        marginBottom: "20px",
+                        border: "1px solid rgba(255,0,0,0.3)",
+                        color: "#d32f2f",
+                    }}
+                >
+                    <h4 style={{ margin: "0 0 10px 0", fontSize: "18px" }}>
+                        ❌ Error from useErrorListener
+                    </h4>
+                    <p style={{ margin: 0 }}>{error}</p>
+                </div>
+            )}
+
             <h3 style={{ margin: "0 0 20px 0", fontSize: "24px" }}>
                 👂 Data Change Listeners
             </h3>
+            
+            <div style={{ marginBottom: "20px" }}>
+                <button
+                    onClick={testError}
+                    style={{
+                        background: "rgba(255,0,0,0.8)",
+                        border: "none",
+                        color: "white",
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        marginRight: "10px",
+                    }}
+                >
+                    🚨 Test Error (useErrorListener)
+                </button>
+                <button
+                    onClick={clearEvents}
+                    style={{
+                        background: "rgba(102, 126, 234, 0.8)",
+                        border: "none",
+                        color: "white",
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                    }}
+                >
+                    🗑️ Clear All
+                </button>
+            </div>
 
             <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
                 <div

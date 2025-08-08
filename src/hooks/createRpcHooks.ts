@@ -159,11 +159,11 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
 
             const findById = React.useCallback(
                 (id: string | number) => repository.findById(typeKey, id),
-                [repository, typeKey]
+                [repository]
             );
             const findAll = React.useCallback(
                 () => repository.findAll(typeKey),
-                [repository, typeKey]
+                [repository]
             );
             const mergeRpc = React.useCallback(
                 (
@@ -176,7 +176,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                           >
                         | InferRpcType<TTypes[typeof typeKey]>[]
                 ) => repository.mergeRpc(typeKey, data),
-                [repository, typeKey]
+                [repository]
             );
 
             if (id !== undefined) {
@@ -230,7 +230,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                 } catch {
                     setFullData(null);
                 }
-            }, [repository, typeName, id]);
+            }, [repository, id]);
 
             React.useEffect(() => {
                 console.log(
@@ -240,7 +240,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     id
                 );
                 getData();
-            }, [getData, allRpcDataString]);
+            }, [getData, allRpcDataString, id]);
             return fullData;
         }
         (hooks as any)[fullRelatedHookName] = useFullRelatedHook;
@@ -288,13 +288,26 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         (event) => event.type === typeName
                     );
                     if (filteredEvents.length > 0) {
+                        const event = filteredEvents[0];
                         console.log(
                             `[${String(
                                 typeName
                             )}Listener] Calling callback with:`,
-                            filteredEvents[0]
+                            event
                         );
-                        callbackRef.current(filteredEvents[0] as any);
+                        
+                        // Для singleton типов payload должен быть объектом, а не массивом
+                        const storageType = (repository as any).getStorageType?.(String(typeName));
+                        if (storageType === "singleton" && Array.isArray(event.payload) && event.payload.length > 0) {
+                            // Для singleton берем первый элемент из массива
+                            const singletonEvent = {
+                                ...event,
+                                payload: event.payload[0]
+                            };
+                            callbackRef.current(singletonEvent as any);
+                        } else {
+                            callbackRef.current(event as any);
+                        }
                     }
                 },
                 []

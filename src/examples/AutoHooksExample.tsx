@@ -89,6 +89,7 @@ repository.defineRelation("user", "product", "favoriteProducts").hasMany(
 // 1. Пользователь создает свой store с Redux Toolkit
 import { configureStore } from "@reduxjs/toolkit";
 import { cartSlice, themeSlice, userSlice } from "./slices/slices";
+import InlineDemo from "./InlineDemo";
 
 // Пользовательский store с несколькими slice'ами
 const userStore = configureStore({
@@ -197,25 +198,25 @@ const CellCodeList: React.FC = () => {
 // Компонент для демонстрации singleton типа (error)
 const ErrorSingletonExample: React.FC = () => {
     const { errors, mergeRpc } = useError();
-    
+
     const handleSetError = () => {
         mergeRpc({
             code: "TEST_ERROR",
             msg: "Это тестовая ошибка",
             tech_msg: "Test error for singleton demonstration",
-            text_code: "test_error"
+            text_code: "test_error",
         });
     };
-    
+
     const handleClearError = () => {
         mergeRpc({
             code: "",
             msg: "",
             tech_msg: "",
-            text_code: ""
+            text_code: "",
         });
     };
-    
+
     return (
         <div
             style={{
@@ -229,7 +230,7 @@ const ErrorSingletonExample: React.FC = () => {
             <h2 style={{ margin: "0 0 20px 0", fontSize: "24px" }}>
                 ⚠️ Error Singleton Example
             </h2>
-            
+
             <div style={{ marginBottom: "15px" }}>
                 <p style={{ fontSize: "14px", opacity: 0.9 }}>
                     Singleton тип хранит только одно значение (не массив)
@@ -244,7 +245,9 @@ const ErrorSingletonExample: React.FC = () => {
                             border: "1px solid rgba(255,255,255,0.2)",
                         }}
                     >
-                        <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                        <div
+                            style={{ fontWeight: "bold", marginBottom: "5px" }}
+                        >
                             Код: {errors.code || "(пусто)"}
                         </div>
                         <div style={{ fontSize: "14px", marginBottom: "5px" }}>
@@ -263,7 +266,7 @@ const ErrorSingletonExample: React.FC = () => {
                     </p>
                 )}
             </div>
-            
+
             <div style={{ display: "flex", gap: "10px" }}>
                 <button
                     onClick={handleSetError}
@@ -1719,6 +1722,7 @@ const App: React.FC = () => {
                         <UserSliceExample />
                     </div>
                 </div>
+                <InlineDemo />
             </RpcProvider>
         </Provider>
     );

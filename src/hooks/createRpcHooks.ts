@@ -11,8 +11,7 @@ const toPascalCase = (s: string): string => {
     return s
         .split("_")
         .map(
-            (word) =>
-                word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
         )
         .join("");
 };
@@ -40,10 +39,11 @@ type RpcHooks<
             [P in K as `${P & string}s`]: RpcStorageType[P] extends "collection"
                 ? InferRpcType<TTypes[P]>[]
                 : RpcStorageType[P] extends "singleton"
-                ? InferRpcType<TTypes[P]>
+                ? InferRpcType<TTypes[P]> | null
                 : InferRpcType<TTypes[P]>[];
         } & {
-            [P in K as `${P & string}Map`]: RpcStorageType[P] extends "collection"
+            [P in K as `${P &
+                string}Map`]: RpcStorageType[P] extends "collection"
                 ? Record<string, InferRpcType<TTypes[P]>>
                 : RpcStorageType[P] extends "singleton"
                 ? InferRpcType<TTypes[P]>
@@ -54,7 +54,10 @@ type RpcHooks<
             mergeRpc: {
                 (
                     data:
-                        | Record<string, Partial<InferRpcType<TTypes[K]>> | null>
+                        | Record<
+                              string,
+                              Partial<InferRpcType<TTypes[K]>> | null
+                          >
                         | InferRpcType<TTypes[K]>[]
                         | Partial<InferRpcType<TTypes[K]>>
                 ): InferRpcType<TTypes[K]>[];
@@ -217,17 +220,23 @@ export const createRpcHooks = <
             if (id !== undefined) {
                 return findById(id);
             }
-            
+
             // Для singleton возвращаем первый элемент или null
-            const storageType = (repository as any).getStorageType?.(String(typeKey));
-            const dataForKey = storageType === "singleton" && list.length > 0 
-                ? list[0] 
-                : (storageType === "singleton" ? null : list);
-            
-            const mapForKey = storageType === "singleton" && list.length > 0
-                ? list[0]
-                : allData;
-            
+            const storageType = (repository as any).getStorageType?.(
+                String(typeKey)
+            );
+            const dataForKey =
+                storageType === "singleton" && list.length > 0
+                    ? list[0]
+                    : storageType === "singleton"
+                    ? null
+                    : list;
+
+            const mapForKey =
+                storageType === "singleton" && list.length > 0
+                    ? list[0]
+                    : allData;
+
             return {
                 [`${String(typeKey)}s`]: dataForKey,
                 [`${String(typeKey)}Map`]: mapForKey,
@@ -301,9 +310,7 @@ export const createRpcHooks = <
 
             // Кэшируем тип хранилища для данного типа
             const storageType = React.useMemo(() => {
-                return (repository as any).getStorageType?.(
-                    String(typeName)
-                );
+                return (repository as any).getStorageType?.(String(typeName));
             }, [repository]);
 
             const invoke = React.useCallback(
@@ -399,13 +406,13 @@ export const createRpcHooks = <
         callbackRef.current = callback;
 
         const types = (options?.types || typeKeys) as Array<keyof TTypes>;
-        
+
         // Стабилизируем массив типов через ключ-строку
         const typesKey = React.useMemo(() => {
             const sorted = [...types].sort();
-            return sorted.join(',');
+            return sorted.join(",");
         }, [types]);
-        
+
         const stableTypes = React.useMemo(() => {
             // Используем typesKey для инвалидации
             void typesKey;

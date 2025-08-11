@@ -33,9 +33,6 @@ export const extendStore = (options: ExtendStoreOptions) => {
         },
     });
 
-    console.log(rpcSlice);
-    
-
     const newReducer = combineReducers({
         ...slices,
         rpc: rpcSlice.reducer,
@@ -47,8 +44,7 @@ export const extendStore = (options: ExtendStoreOptions) => {
         events.forEach((event) => {
             const { type, payload } = event;
             const storageType = repository.getStorageType(String(type));
-            console.log(type, payload);
-            
+
             if (storageType === "singleton") {
                 store.dispatch(
                     rpcSlice.actions.setData({

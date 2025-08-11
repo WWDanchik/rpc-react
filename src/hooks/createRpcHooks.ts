@@ -118,7 +118,6 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
 export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     typeKeys: Array<keyof TTypes>
 ): RpcHooks<TTypes> => {
-    // Используем единый пустой объект, чтобы не создавать новый reference в селекторах
     const EMPTY_MAP: Record<string, unknown> = Object.freeze({});
 
     const toPascalCase = (s: string): string => {
@@ -149,9 +148,9 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
 
             const list = React.useMemo(
                 () =>
-                    (Object.values(allData) as InferRpcType<
+                    Object.values(allData) as InferRpcType<
                         TTypes[typeof typeKey]
-                    >[]),
+                    >[],
                 [allData]
             );
 
@@ -194,7 +193,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
 
         (hooks as any)[hookName] = useHook;
 
-        // Хуки для полных связанных данных
         const fullRelatedHookName = `use${toPascalCase(
             String(typeName)
         )}FullRelatedData` as keyof RpcHooks<TTypes>;
@@ -208,7 +206,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             );
 
             const fullData = React.useMemo(() => {
-                // Привязываем вычисление к изменениям rpc-состояния, не выполняя дорогостоящих операций
                 // eslint-disable-next-line @typescript-eslint/no-unused-expressions
                 allRpcData;
                 try {
@@ -226,7 +223,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         (hooks as any)[fullRelatedHookName] = useFullRelatedHook;
     });
 
-    // Хуки для слушателей с типизацией
     typeKeys.forEach((typeName) => {
         const listenerHookName = `use${toPascalCase(
             String(typeName)
@@ -283,7 +279,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             );
 
             React.useEffect(() => {
-                // Удаляем предыдущую подписку если есть
                 if (
                     listenerIdRef.current &&
                     typeof (repository as any).offDataChanged === "function"
@@ -317,9 +312,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     listenerIdRef.current &&
                     typeof (repository as any).offDataChanged === "function"
                 ) {
-                    (repository as any).offDataChanged(
-                        listenerIdRef.current
-                    );
+                    (repository as any).offDataChanged(listenerIdRef.current);
                     listenerIdRef.current = null;
                 }
             };
@@ -354,7 +347,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         const stableTypes = React.useMemo(() => types, [types]);
 
         React.useEffect(() => {
-            // Удаляем предыдущую подписку если есть
             if (
                 listenerIdRef.current &&
                 typeof (repository as any).offDataChanged === "function"
@@ -392,7 +384,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     }
     (hooks as any).useDataListener = useDataListener;
 
-    // Хуки для связанных данных
     typeKeys.forEach((typeName) => {
         const relatedHookName = `use${toPascalCase(
             String(typeName)
@@ -412,33 +403,29 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     (state.rpc[targetType] as unknown) ?? EMPTY_MAP
             );
 
-            const relatedData = React.useMemo(
-                () => {
-                    // Привязываем вычисление к изменениям источников
-                    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-                    sourceData;
-                    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-                    targetData;
-                    try {
-                        return (repository as any).getRelated(
-                            typeName,
-                            id,
-                            targetType
-                        ) as Array<
-                            TTypes[TTarget] extends Rpc<infer S>
-                                ? z.infer<S>
-                                : never
-                        >;
-                    } catch {
-                        return [] as Array<
-                            TTypes[TTarget] extends Rpc<infer S>
-                                ? z.infer<S>
-                                : never
-                        >;
-                    }
-                },
-                [repository, id, targetType, sourceData, targetData]
-            );
+            const relatedData = React.useMemo(() => {
+                // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+                sourceData;
+                // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+                targetData;
+                try {
+                    return (repository as any).getRelated(
+                        typeName,
+                        id,
+                        targetType
+                    ) as Array<
+                        TTypes[TTarget] extends Rpc<infer S>
+                            ? z.infer<S>
+                            : never
+                    >;
+                } catch {
+                    return [] as Array<
+                        TTypes[TTarget] extends Rpc<infer S>
+                            ? z.infer<S>
+                            : never
+                    >;
+                }
+            }, [repository, id, targetType, sourceData, targetData]);
 
             return relatedData;
         }

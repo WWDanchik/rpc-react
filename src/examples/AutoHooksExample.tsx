@@ -82,98 +82,6 @@ repository.defineRelation("user", "product", "favoriteProducts").hasMany(
     "id"
 );
 
-repository.save("user", {
-    id: 1,
-    name: "Dmitriy",
-    email: "dmitriy@example.com",
-    age: 12,
-    favoriteProducts: [{ id: 1 }, { id: 2 }],
-    ownedProducts: [{ id: 1 }],
-});
-
-repository.save("user", {
-    id: 2,
-    name: "Jane Smith",
-    email: "jane.smith@example.com",
-    age: 25,
-    favoriteProducts: [{ id: 1 }],
-    ownedProducts: [{ id: 2 }],
-});
-
-repository.save("product", {
-    id: 1,
-    name: "Product 1",
-    price: 100,
-    description: "Product description",
-    ownerId: 1,
-    purchasedByUsers: [{ id: 1 }, { id: 2 }],
-});
-
-repository.save("product", {
-    id: 2,
-    name: "Product 2",
-    price: 200,
-    description: "Another product",
-    ownerId: 2,
-    purchasedByUsers: [{ id: 1 }],
-});
-
-repository.save("rectangle", {
-    id: 1,
-    width: 100,
-    height: 100,
-    createdByUserId: 1,
-});
-
-repository.save("cell_code", {
-    id: 1,
-    code: "ABC123",
-    description: "Sample cell code",
-    isActive: true,
-});
-
-repository.handleMessages([
-    {
-        type: "user",
-        payload: [
-            {
-                id: 1,
-                name: "John Doe",
-                email: "john.doe@example.com",
-                age: 12,
-            },
-            {
-                id: 1123,
-                name: "John Doe 1112321312",
-                email: "john.doe@example.com",
-                age: 121,
-            },
-        ],
-    },
-]);
-
-setTimeout(() => {
-    repository.handleMessages([
-        {
-            type: "user",
-            payload: {
-                143: {
-                    name: "John Doe 143",
-                    email: "john.doe@example.com",
-                    age: 121,
-                    id: 143,
-                },
-                144: {
-                    name: "John Doe 144",
-                    email: "john.doe@example.com",
-                    age: 121,
-                    id: 144,
-                },
-            },
-        },
-    ]);
-}, 3000);
-
 // ========================================
 // ПРИМЕР ИСПОЛЬЗОВАНИЯ БИБЛИОТЕКИ
 // ========================================
@@ -227,8 +135,6 @@ const {
     useUserRelated,
     useProductRelated,
     useCellCode,
-
-    useUserListener,
 
     useErrorListener,
     useHandleMessages,
@@ -290,9 +196,7 @@ const CellCodeList: React.FC = () => {
 // Компонент для работы с пользователями
 const UsersList: React.FC = () => {
     const { users, mergeRpc } = useUser();
-    useUserListener<RpcStorageType>((events) => {
-        console.log(events);
-    });
+
     const handleAddUser = () => {
         const id = Math.floor(Math.random() * 1000);
         mergeRpc({
@@ -347,6 +251,11 @@ const UsersList: React.FC = () => {
                             style={{ fontWeight: "bold", marginBottom: "5px" }}
                         >
                             {user.name}
+                        </div>
+                        <div
+                            style={{ fontWeight: "bold", marginBottom: "5px" }}
+                        >
+                            {user.id}
                         </div>
                         <div style={{ fontSize: "14px", opacity: 0.9 }}>
                             Age: {user.age} years

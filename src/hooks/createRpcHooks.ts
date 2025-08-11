@@ -118,6 +118,9 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
 export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
     typeKeys: Array<keyof TTypes>
 ): RpcHooks<TTypes> => {
+    // Используем единый пустой объект, чтобы не создавать новый reference в селекторах
+    const EMPTY_MAP: Record<string, unknown> = Object.freeze({});
+
     const toPascalCase = (s: string): string => {
         return s
             .split("_")
@@ -140,7 +143,16 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         function useHook(id?: string | number) {
             const { repository } = useRpc<TTypes>();
             const allData = useSelector(
-                (state: RpcState<TTypes>) => state.rpc[typeKey] || {}
+                (state: RpcState<TTypes>) =>
+                    (state.rpc[typeKey] as unknown) ?? EMPTY_MAP
+            ) as Record<string | number, InferRpcType<TTypes[typeof typeKey]>>;
+
+            const list = React.useMemo(
+                () =>
+                    (Object.values(allData) as InferRpcType<
+                        TTypes[typeof typeKey]
+                    >[]),
+                [allData]
             );
 
             const findById = React.useCallback(
@@ -169,9 +181,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                 return findById(id);
             }
             return {
-                [`${String(typeKey)}s`]: Object.values(allData) as InferRpcType<
-                    TTypes[typeof typeKey]
-                >[],
+                [`${String(typeKey)}s`]: list,
                 [`${String(typeKey)}Map`]: allData as Record<
                     string,
                     InferRpcType<TTypes[typeof typeKey]>
@@ -196,37 +206,21 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const allRpcData = useSelector(
                 (state: RpcState<TTypes>) => state.rpc
             );
-            const [fullData, setFullData] = React.useState<
-                TResult | TResult[] | null
-            >(null);
 
-            // Стабилизируем данные с помощью useMemo
-            const allRpcDataString = React.useMemo(
-                () => JSON.stringify(allRpcData),
-                [allRpcData]
-            );
-
-            const getData = React.useCallback(() => {
+            const fullData = React.useMemo(() => {
+                // Привязываем вычисление к изменениям rpc-состояния, не выполняя дорогостоящих операций
+                // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+                allRpcData;
                 try {
-                    const result = (repository as any).getFullRelatedData(
+                    return (repository as any).getFullRelatedData(
                         typeName,
                         id
                     ) as TResult | TResult[] | null;
-                    setFullData(result);
                 } catch {
-                    setFullData(null);
+                    return null;
                 }
-            }, [repository, id]);
+            }, [repository, id, allRpcData]);
 
-            React.useEffect(() => {
-                console.log(
-                    `[${String(
-                        typeName
-                    )}FullRelatedData] Fetching full related data for id:`,
-                    id
-                );
-                getData();
-            }, [getData, allRpcDataString, id]);
             return fullData;
         }
         (hooks as any)[fullRelatedHookName] = useFullRelatedHook;
@@ -256,48 +250,36 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const { repository } = useRpc<TTypes>();
             const callbackRef = React.useRef(callback);
             const listenerIdRef = React.useRef<string | number | null>(null);
-            const isSubscribedRef = React.useRef(false);
             callbackRef.current = callback;
-            const filteredCallback = React.useCallback(
+
+            const invoke = React.useCallback(
                 (
                     events: Array<{
                         type: typeof typeName;
                         payload: any;
                     }>
                 ) => {
-                    const filteredEvents = events.filter(
-                        (event) => event.type === typeName
-                    );
-                    if (filteredEvents.length > 0) {
-                        const event = filteredEvents[0];
-                        console.log(
-                            `[${String(
-                                typeName
-                            )}Listener] Calling callback with:`,
-                            event
-                        );
+                    if (!events || events.length === 0) return;
+                    const event = events[0];
 
-                        // Для singleton типов payload должен быть объектом, а не массивом
-                        const storageType = (
-                            repository as any
-                        ).getStorageType?.(String(typeName));
-                        if (
-                            storageType === "singleton" &&
-                            Array.isArray(event.payload) &&
-                            event.payload.length > 0
-                        ) {
-                            // Для singleton берем первый элемент из массива
-                            const singletonEvent = {
-                                ...event,
-                                payload: event.payload[0],
-                            };
-                            callbackRef.current(singletonEvent as any);
-                        } else {
-                            callbackRef.current(event as any);
-                        }
+                    const storageType = (repository as any).getStorageType?.(
+                        String(typeName)
+                    );
+                    if (
+                        storageType === "singleton" &&
+                        Array.isArray(event.payload) &&
+                        event.payload.length > 0
+                    ) {
+                        const singletonEvent = {
+                            ...event,
+                            payload: event.payload[0],
+                        };
+                        callbackRef.current(singletonEvent as any);
+                    } else {
+                        callbackRef.current(event as any);
                     }
                 },
-                []
+                [repository]
             );
 
             React.useEffect(() => {
@@ -308,18 +290,14 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                 ) {
                     (repository as any).offDataChanged(listenerIdRef.current);
                     listenerIdRef.current = null;
-                    isSubscribedRef.current = false;
                 }
 
-                if (!isSubscribedRef.current) {
-                    listenerIdRef.current = (repository as any).onDataChanged(
-                        filteredCallback,
-                        {
-                            types: [typeName],
-                        }
-                    );
-                    isSubscribedRef.current = true;
-                }
+                listenerIdRef.current = (repository as any).onDataChanged(
+                    invoke,
+                    {
+                        types: [typeName],
+                    }
+                );
 
                 return () => {
                     if (
@@ -330,11 +308,21 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                             listenerIdRef.current
                         );
                         listenerIdRef.current = null;
-                        isSubscribedRef.current = false;
                     }
                 };
-            }, [repository, filteredCallback]);
-            return () => {};
+            }, [repository, invoke]);
+            // Возвращаем функцию для ручной отписки
+            return () => {
+                if (
+                    listenerIdRef.current &&
+                    typeof (repository as any).offDataChanged === "function"
+                ) {
+                    (repository as any).offDataChanged(
+                        listenerIdRef.current
+                    );
+                    listenerIdRef.current = null;
+                }
+            };
         }
         (hooks as any)[listenerHookName] = useListenerHook;
     });
@@ -362,6 +350,9 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         const listenerIdRef = React.useRef<string | number | null>(null);
         callbackRef.current = callback;
 
+        const types = (options?.types || typeKeys) as Array<keyof TTypes>;
+        const stableTypes = React.useMemo(() => types, [types]);
+
         React.useEffect(() => {
             // Удаляем предыдущую подписку если есть
             if (
@@ -375,7 +366,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             listenerIdRef.current = (repository as any).onDataChanged(
                 callbackRef.current as any,
                 {
-                    types: options?.types || typeKeys,
+                    types: stableTypes,
                 }
             );
             return () => {
@@ -387,8 +378,17 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     listenerIdRef.current = null;
                 }
             };
-        }, [repository, options?.types]);
-        return () => {};
+        }, [repository, stableTypes]);
+        // Возвращаем функцию для ручной отписки
+        return () => {
+            if (
+                listenerIdRef.current &&
+                typeof (repository as any).offDataChanged === "function"
+            ) {
+                (repository as any).offDataChanged(listenerIdRef.current);
+                listenerIdRef.current = null;
+            }
+        };
     }
     (hooks as any).useDataListener = useDataListener;
 
@@ -404,55 +404,42 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         ) {
             const { repository } = useRpc<TTypes>();
             const sourceData = useSelector(
-                (state: RpcState<TTypes>) => state.rpc[typeName] || {}
+                (state: RpcState<TTypes>) =>
+                    (state.rpc[typeName] as unknown) ?? EMPTY_MAP
             );
             const targetData = useSelector(
-                (state: RpcState<TTypes>) => state.rpc[targetType] || {}
-            );
-            const [relatedData, setRelatedData] = React.useState<
-                Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>
-            >([]);
-
-            // Стабилизируем данные с помощью useMemo
-            const sourceDataString = React.useMemo(
-                () => JSON.stringify(sourceData),
-                [sourceData]
-            );
-            const targetDataString = React.useMemo(
-                () => JSON.stringify(targetData),
-                [targetData]
+                (state: RpcState<TTypes>) =>
+                    (state.rpc[targetType] as unknown) ?? EMPTY_MAP
             );
 
-            const getRelatedData = React.useCallback(() => {
-                try {
-                    const result = (repository as any).getRelated(
-                        typeName,
-                        id,
-                        targetType
-                    );
-                    setRelatedData(result);
-                } catch {
-                    setRelatedData([]);
-                }
-            }, [repository, id, targetType]);
+            const relatedData = React.useMemo(
+                () => {
+                    // Привязываем вычисление к изменениям источников
+                    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+                    sourceData;
+                    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+                    targetData;
+                    try {
+                        return (repository as any).getRelated(
+                            typeName,
+                            id,
+                            targetType
+                        ) as Array<
+                            TTypes[TTarget] extends Rpc<infer S>
+                                ? z.infer<S>
+                                : never
+                        >;
+                    } catch {
+                        return [] as Array<
+                            TTypes[TTarget] extends Rpc<infer S>
+                                ? z.infer<S>
+                                : never
+                        >;
+                    }
+                },
+                [repository, id, targetType, sourceData, targetData]
+            );
 
-            React.useEffect(() => {
-                console.log(
-                    `[${String(
-                        typeName
-                    )}Related] Fetching related data for id:`,
-                    id,
-                    "targetType:",
-                    targetType
-                );
-                getRelatedData();
-            }, [
-                getRelatedData,
-                id,
-                sourceDataString,
-                targetDataString,
-                targetType,
-            ]);
             return relatedData;
         }
         (hooks as any)[relatedHookName] = useRelatedHook;

@@ -7,6 +7,16 @@ import { useRpc } from "./useRpc";
 
 type InferRpcType<T> = T extends Rpc<infer S> ? z.infer<S> : never;
 
+const toPascalCase = (s: string): string => {
+    return s
+        .split("_")
+        .map(
+            (word) =>
+                word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .join("");
+};
+
 type ToPascalCase<S extends string> = S extends `${infer First}_${infer Rest}`
     ? `${Capitalize<First>}${ToPascalCase<Rest>}`
     : Capitalize<S>;
@@ -30,11 +40,26 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
         } & {
             findById: (id: string | number) => InferRpcType<TTypes[K]> | null;
             findAll: () => InferRpcType<TTypes[K]>[];
-            mergeRpc: (
-                data:
-                    | Record<string, Partial<InferRpcType<TTypes[K]>> | null>
-                    | InferRpcType<TTypes[K]>[]
-            ) => void;
+            mergeRpc: {
+                (
+                    data:
+                        | Record<string, Partial<InferRpcType<TTypes[K]>> | null>
+                        | InferRpcType<TTypes[K]>[]
+                        | Partial<InferRpcType<TTypes[K]>>
+                ): InferRpcType<TTypes[K]>[];
+                <RpcStorageType extends Record<keyof TTypes, StorageType>>(
+                    data: RpcStorageType[K] extends "collection"
+                        ?
+                              | Record<
+                                    string,
+                                    Partial<InferRpcType<TTypes[K]>> | null
+                                >
+                              | InferRpcType<TTypes[K]>[]
+                        : RpcStorageType[K] extends "singleton"
+                        ? Partial<InferRpcType<TTypes[K]>>
+                        : never
+                ): InferRpcType<TTypes[K]>[];
+            };
         };
         (id: string | number): InferRpcType<TTypes[K]> | null;
     };
@@ -120,16 +145,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
 ): RpcHooks<TTypes> => {
     const EMPTY_MAP: Record<string, unknown> = Object.freeze({});
 
-    const toPascalCase = (s: string): string => {
-        return s
-            .split("_")
-            .map(
-                (word) =>
-                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-            )
-            .join("");
-    };
-
     const hooks = {} as RpcHooks<TTypes>;
 
     // Основные хуки для каждого типа
@@ -172,7 +187,8 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                               > | null
                           >
                         | InferRpcType<TTypes[typeof typeKey]>[]
-                ) => repository.mergeRpc(typeKey, data),
+                        | Partial<InferRpcType<TTypes[typeof typeKey]>>
+                ) => repository.mergeRpc(typeKey, data) as InferRpcType<TTypes[typeof typeKey]>[],
                 [repository]
             );
 
@@ -205,9 +221,14 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                 (state: RpcState<TTypes>) => state.rpc
             );
 
+            // Используем версию rpc-данных для инвалидации кэша
+            const rpcVersion = React.useMemo(() => {
+                return Object.keys(allRpcData).length;
+            }, [allRpcData]);
+
             const fullData = React.useMemo(() => {
-                // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-                allRpcData;
+                // Привязываем пересчет к rpcVersion
+                void rpcVersion;
                 try {
                     return (repository as any).getFullRelatedData(
                         typeName,
@@ -216,7 +237,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                 } catch {
                     return null;
                 }
-            }, [repository, id, allRpcData]);
+            }, [repository, id, rpcVersion]);
 
             return fullData;
         }
@@ -248,6 +269,13 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
             const listenerIdRef = React.useRef<string | number | null>(null);
             callbackRef.current = callback;
 
+            // Кэшируем тип хранилища для данного типа
+            const storageType = React.useMemo(() => {
+                return (repository as any).getStorageType?.(
+                    String(typeName)
+                );
+            }, [repository]);
+
             const invoke = React.useCallback(
                 (
                     events: Array<{
@@ -258,9 +286,6 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     if (!events || events.length === 0) return;
                     const event = events[0];
 
-                    const storageType = (repository as any).getStorageType?.(
-                        String(typeName)
-                    );
                     if (
                         storageType === "singleton" &&
                         Array.isArray(event.payload) &&
@@ -275,7 +300,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                         callbackRef.current(event as any);
                     }
                 },
-                [repository]
+                [storageType]
             );
 
             React.useEffect(() => {
@@ -344,7 +369,18 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
         callbackRef.current = callback;
 
         const types = (options?.types || typeKeys) as Array<keyof TTypes>;
-        const stableTypes = React.useMemo(() => types, [types]);
+        
+        // Стабилизируем массив типов через ключ-строку
+        const typesKey = React.useMemo(() => {
+            const sorted = [...types].sort();
+            return sorted.join(',');
+        }, [types]);
+        
+        const stableTypes = React.useMemo(() => {
+            // Используем typesKey для инвалидации
+            void typesKey;
+            return options?.types || typeKeys;
+        }, [typesKey, options?.types]);
 
         React.useEffect(() => {
             if (
@@ -403,11 +439,16 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                     (state.rpc[targetType] as unknown) ?? EMPTY_MAP
             );
 
+            // Используем объединенную версию для инвалидации кэша
+            const dataVersion = React.useMemo(() => {
+                const sourceKeys = Object.keys(sourceData as any).length;
+                const targetKeys = Object.keys(targetData as any).length;
+                return `${sourceKeys}:${targetKeys}`;
+            }, [sourceData, targetData]);
+
             const relatedData = React.useMemo(() => {
-                // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-                sourceData;
-                // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-                targetData;
+                // Привязываем пересчет к dataVersion
+                void dataVersion;
                 try {
                     return (repository as any).getRelated(
                         typeName,
@@ -425,7 +466,7 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                             : never
                     >;
                 }
-            }, [repository, id, targetType, sourceData, targetData]);
+            }, [repository, id, targetType, dataVersion]);
 
             return relatedData;
         }

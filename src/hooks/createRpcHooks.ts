@@ -27,16 +27,27 @@ interface RpcState<TTypes extends Record<string, Rpc<any>>> {
     };
 }
 
-type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
+type RpcHooks<
+    TTypes extends Record<string, Rpc<any>>,
+    RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
+        keyof TTypes,
+        StorageType
+    >
+> = {
     // Основные хуки для каждого типа
     [K in keyof TTypes as `use${ToPascalCase<string & K>}`]: {
         (): {
-            [P in K as `${P & string}s`]: InferRpcType<TTypes[P]>[];
+            [P in K as `${P & string}s`]: RpcStorageType[P] extends "collection"
+                ? InferRpcType<TTypes[P]>[]
+                : RpcStorageType[P] extends "singleton"
+                ? InferRpcType<TTypes[P]>
+                : InferRpcType<TTypes[P]>[];
         } & {
-            [P in K as `${P & string}Map`]: Record<
-                string,
-                InferRpcType<TTypes[P]>
-            >;
+            [P in K as `${P & string}Map`]: RpcStorageType[P] extends "collection"
+                ? Record<string, InferRpcType<TTypes[P]>>
+                : RpcStorageType[P] extends "singleton"
+                ? InferRpcType<TTypes[P]>
+                : Record<string, InferRpcType<TTypes[P]>>;
         } & {
             findById: (id: string | number) => InferRpcType<TTypes[K]> | null;
             findAll: () => InferRpcType<TTypes[K]>[];
@@ -140,12 +151,18 @@ type RpcHooks<TTypes extends Record<string, Rpc<any>>> = {
     };
 };
 
-export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
+export const createRpcHooks = <
+    TTypes extends Record<string, Rpc<any>>,
+    RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
+        keyof TTypes,
+        StorageType
+    >
+>(
     typeKeys: Array<keyof TTypes>
-): RpcHooks<TTypes> => {
+): RpcHooks<TTypes, RpcStorageType> => {
     const EMPTY_MAP: Record<string, unknown> = Object.freeze({});
 
-    const hooks = {} as RpcHooks<TTypes>;
+    const hooks = {} as RpcHooks<TTypes, RpcStorageType>;
 
     // Основные хуки для каждого типа
     typeKeys.forEach((typeName) => {
@@ -188,19 +205,32 @@ export const createRpcHooks = <TTypes extends Record<string, Rpc<any>>>(
                           >
                         | InferRpcType<TTypes[typeof typeKey]>[]
                         | Partial<InferRpcType<TTypes[typeof typeKey]>>
-                ) => repository.mergeRpc(typeKey, data) as InferRpcType<TTypes[typeof typeKey]>[],
+                ) => {
+                    const result = repository.mergeRpc(typeKey, data);
+                    // Для типизации - repository.mergeRpc всегда возвращает массив
+                    // но клиентский код может ожидать разные типы в зависимости от storageType
+                    return result as any;
+                },
                 [repository]
             );
 
             if (id !== undefined) {
                 return findById(id);
             }
+            
+            // Для singleton возвращаем первый элемент или null
+            const storageType = (repository as any).getStorageType?.(String(typeKey));
+            const dataForKey = storageType === "singleton" && list.length > 0 
+                ? list[0] 
+                : (storageType === "singleton" ? null : list);
+            
+            const mapForKey = storageType === "singleton" && list.length > 0
+                ? list[0]
+                : allData;
+            
             return {
-                [`${String(typeKey)}s`]: list,
-                [`${String(typeKey)}Map`]: allData as Record<
-                    string,
-                    InferRpcType<TTypes[typeof typeKey]>
-                >,
+                [`${String(typeKey)}s`]: dataForKey,
+                [`${String(typeKey)}Map`]: mapForKey,
                 findById,
                 findAll,
                 mergeRpc,

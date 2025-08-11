@@ -61,7 +61,7 @@ const cell_codeRpc = new Rpc("cell_code", cell_codeSchema, "id");
 
 const repository = new RpcRepository()
     .registerRpc("user", userRpc, { storageType: "collection" })
-    .registerRpc("product", productRpc, { storageType: "singleton" })
+    .registerRpc("product", productRpc, { storageType: "collection" })
     .registerRpc("rectangle", rectangleRpc, { storageType: "collection" })
     .registerRpc("cell_code", cell_codeRpc, { storageType: "collection" })
     .registerRpc("error", errorRpc, { storageType: "singleton" });
@@ -118,7 +118,7 @@ const { store: extendedStore, repository: configuredRepository } = extendStore({
 
 type RpcStorageType = {
     user: "collection";
-    product: "singleton";
+    product: "collection";
     rectangle: "collection";
     cell_code: "collection";
     error: "singleton";
@@ -138,7 +138,8 @@ const {
 
     useErrorListener,
     useHandleMessages,
-} = createRpcHooks<RepositoryTypes<typeof repository>>([
+    useError,
+} = createRpcHooks<RepositoryTypes<typeof repository>, RpcStorageType>([
     "cell_code",
     "user",
     "product",
@@ -189,6 +190,110 @@ const CellCodeList: React.FC = () => {
                     </li>
                 ))}
             </ul>
+        </div>
+    );
+};
+
+// Компонент для демонстрации singleton типа (error)
+const ErrorSingletonExample: React.FC = () => {
+    const { errors, mergeRpc } = useError();
+    
+    const handleSetError = () => {
+        mergeRpc({
+            code: "TEST_ERROR",
+            msg: "Это тестовая ошибка",
+            tech_msg: "Test error for singleton demonstration",
+            text_code: "test_error"
+        });
+    };
+    
+    const handleClearError = () => {
+        mergeRpc({
+            code: "",
+            msg: "",
+            tech_msg: "",
+            text_code: ""
+        });
+    };
+    
+    return (
+        <div
+            style={{
+                background: "linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%)",
+                padding: "20px",
+                borderRadius: "12px",
+                color: "white",
+                minWidth: "300px",
+            }}
+        >
+            <h2 style={{ margin: "0 0 20px 0", fontSize: "24px" }}>
+                ⚠️ Error Singleton Example
+            </h2>
+            
+            <div style={{ marginBottom: "15px" }}>
+                <p style={{ fontSize: "14px", opacity: 0.9 }}>
+                    Singleton тип хранит только одно значение (не массив)
+                </p>
+                {errors && (
+                    <div
+                        style={{
+                            background: "rgba(255,255,255,0.1)",
+                            padding: "15px",
+                            borderRadius: "8px",
+                            marginTop: "10px",
+                            border: "1px solid rgba(255,255,255,0.2)",
+                        }}
+                    >
+                        <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                            Код: {errors.code || "(пусто)"}
+                        </div>
+                        <div style={{ fontSize: "14px", marginBottom: "5px" }}>
+                            Сообщение: {errors.msg || "(пусто)"}
+                        </div>
+                        {errors.tech_msg && (
+                            <div style={{ fontSize: "12px", opacity: 0.8 }}>
+                                Техническое: {errors.tech_msg}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {!errors && (
+                    <p style={{ fontStyle: "italic", opacity: 0.8 }}>
+                        Нет активной ошибки
+                    </p>
+                )}
+            </div>
+            
+            <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                    onClick={handleSetError}
+                    style={{
+                        background: "rgba(255,255,255,0.2)",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        color: "white",
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                    }}
+                >
+                    🚨 Установить ошибку
+                </button>
+                <button
+                    onClick={handleClearError}
+                    style={{
+                        background: "rgba(255,255,255,0.2)",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        color: "white",
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                    }}
+                >
+                    ✅ Очистить ошибку
+                </button>
+            </div>
         </div>
     );
 };
@@ -1600,6 +1705,7 @@ const App: React.FC = () => {
                             <UsersList />
                             <ProductsList />
                             <CellCodeList />
+                            <ErrorSingletonExample />
                         </div>
 
                         <ItemDetails />

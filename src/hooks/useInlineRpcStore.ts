@@ -62,6 +62,43 @@ type InlineRpcHooks<
         (id: string | number): InferRpcType<TTypes[K]> | null;
     };
 } & {
+    // Пер-типовые слушатели
+    [K in keyof TTypes as `use${ToPascalCase<string & K>}Listener`]: <
+        RpcStorageTypeMap extends Record<
+            keyof TTypes,
+            StorageType
+        > = RpcStorageType
+    >(
+        callback: (event: {
+            type: K;
+            payload: RpcStorageTypeMap[K] extends "collection"
+                ? Array<InferRpcType<TTypes[K]>>
+                : RpcStorageTypeMap[K] extends "singleton"
+                ? InferRpcType<TTypes[K]>
+                : Array<InferRpcType<TTypes[K]>>;
+        }) => void
+    ) => () => void;
+} & {
+    // Общий слушатель по нескольким типам
+    useDataListener: <
+        RpcStorageTypeMap extends Record<
+            keyof TTypes,
+            StorageType
+        > = RpcStorageType
+    >(
+        callback: (
+            events: Array<{
+                type: keyof TTypes;
+                payload: RpcStorageTypeMap[keyof TTypes] extends "collection"
+                    ? Array<InferRpcType<TTypes[keyof TTypes]>>
+                    : RpcStorageTypeMap[keyof TTypes] extends "singleton"
+                    ? InferRpcType<TTypes[keyof TTypes]>
+                    : Array<InferRpcType<TTypes[keyof TTypes]>>;
+            }>
+        ) => void,
+        options?: { types?: (keyof TTypes)[] }
+    ) => () => void;
+} & {
     useHandleMessages: () => {
         handleMessages<
             RpcStorageType extends Record<keyof TTypes, StorageType>
@@ -282,7 +319,115 @@ export function useInlineRpcStore<
             }
 
             (result as any)[hookName] = useTypeHook;
+
+            // Типизированный слушатель событий для конкретного типа
+            const listenerHookName = `use${toPascalCase(
+                String(typeName)
+            )}Listener`;
+
+            function useListenerHook<
+                RpcStorageTypeMap extends Record<
+                    keyof TTypes,
+                    StorageType
+                > = RpcStorageType
+            >(
+                callback: (event: {
+                    type: typeof typeName;
+                    payload: RpcStorageTypeMap[typeof typeName] extends "collection"
+                        ? Array<InferRpcType<TTypes[typeof typeName]>>
+                        : RpcStorageTypeMap[typeof typeName] extends "singleton"
+                        ? InferRpcType<TTypes[typeof typeName]>
+                        : Array<InferRpcType<TTypes[typeof typeName]>>;
+                }) => void
+            ) {
+                const callbackRef = React.useRef(callback);
+                callbackRef.current = callback;
+
+                React.useEffect(() => {
+                    const unsub = repository.onDataChanged(
+                        (
+                            events: Array<{
+                                type: keyof TTypes;
+                                payload: any;
+                            }>
+                        ) => {
+                            const filtered = events.filter(
+                                (e) => e.type === typeName
+                            );
+                            if (filtered.length === 0) return;
+                            const event = filtered[0];
+                            const storageType = repository.getStorageType(
+                                String(typeName)
+                            );
+                            if (
+                                storageType === "singleton" &&
+                                Array.isArray(event.payload)
+                            ) {
+                                const payload = event.payload[0] ?? null;
+                                // для singleton ожидаем объект
+                                if (payload) {
+                                    callbackRef.current({
+                                        type: typeName,
+                                        payload,
+                                    } as any);
+                                }
+                            } else {
+                                callbackRef.current(event as any);
+                            }
+                        },
+                        { types: [typeName] as any }
+                    );
+                    return () => {
+                        repository.offDataChanged(unsub);
+                    };
+                }, []);
+                return () => {};
+            }
+
+            (result as any)[listenerHookName] = useListenerHook;
         });
+
+        // Общий слушатель данных по нескольким типам
+        function useDataListener<
+            RpcStorageTypeMap extends Record<
+                keyof TTypes,
+                StorageType
+            > = RpcStorageType
+        >(
+            callback: (
+                events: Array<{
+                    type: keyof TTypes;
+                    payload: RpcStorageTypeMap[keyof TTypes] extends "collection"
+                        ? Array<InferRpcType<TTypes[keyof TTypes]>>
+                        : RpcStorageTypeMap[keyof TTypes] extends "singleton"
+                        ? InferRpcType<TTypes[keyof TTypes]>
+                        : Array<InferRpcType<TTypes[keyof TTypes]>>;
+                }>
+            ) => void,
+            options?: { types?: (keyof TTypes)[] }
+        ) {
+            const callbackRef = React.useRef(callback);
+            callbackRef.current = callback;
+
+            const types = options?.types ?? (typeNames as (keyof TTypes)[]);
+            const typesKey = React.useMemo(
+                () => [...types].map(String).sort().join("|"),
+                [types]
+            );
+
+            React.useEffect(() => {
+                const unsub = repository.onDataChanged(
+                    (events: any) => callbackRef.current(events),
+                    { types: types as any }
+                );
+                return () => {
+                    repository.offDataChanged(unsub);
+                };
+            }, [repository, typesKey]);
+            return () => {};
+        }
+
+        (result as any).useDataListener = useDataListener;
 
         function useHandleMessages() {
             const handleMessages = (

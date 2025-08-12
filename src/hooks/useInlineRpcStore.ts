@@ -104,8 +104,6 @@ export function useInlineRpcStore<
     React.useEffect(() => {
         const unsubscribe = repository.onDataChanged(
             (events: Array<{ type: keyof TTypes; payload: any }>) => {
-                console.log(events);
-
                 setRpcState((prev) => {
                     const next: RpcState<TTypes> = { ...prev };
                     for (const event of events) {
@@ -190,9 +188,9 @@ export function useInlineRpcStore<
                             | Partial<InferRpcType<TTypes[typeof typeName]>>
                     ) => {
                         repository.mergeRpc(typeName, data);
-                        const updated = repository.findAll(
-                            typeName
-                        ) as Array<InferRpcType<TTypes[typeof typeName]>>;
+                        const updated = repository.findAll(typeName) as Array<
+                            InferRpcType<TTypes[typeof typeName]>
+                        >;
                         setRpcState((prev) => {
                             const next: RpcState<TTypes> = { ...prev };
                             if (storageType === "singleton") {

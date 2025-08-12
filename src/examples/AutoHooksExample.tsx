@@ -163,8 +163,7 @@ const {
 
 const BarcodeCodeList: React.FC = () => {
     const { barcode_codes, mergeRpc } = useBarcodeCode();
-    console.log(barcode_codes);
-    
+
     const handleAddBarcodeCode = () => {
         const testBarcodes = {
             "0000007959028": {

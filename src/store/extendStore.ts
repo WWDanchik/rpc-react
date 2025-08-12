@@ -43,9 +43,14 @@ export const extendStore = (options: ExtendStoreOptions) => {
     const unsubscribe = repository.onDataChanged((events) => {
         events.forEach((event) => {
             const { type, payload } = event;
+
+            console.log(payload);
+
             const storageType = repository.getStorageType(String(type));
 
             if (storageType === "singleton") {
+                console.log(payload);
+                
                 store.dispatch(
                     rpcSlice.actions.setData({
                         type: String(type),

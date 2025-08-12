@@ -189,6 +189,8 @@ export const createRpcHooks = <
                 [allData]
             );
 
+            console.log(list[0]);
+
             const findById = React.useCallback(
                 (id: string | number) => repository.findById(typeKey, id),
                 [repository]
@@ -209,10 +211,7 @@ export const createRpcHooks = <
                         | InferRpcType<TTypes[typeof typeKey]>[]
                         | Partial<InferRpcType<TTypes[typeof typeKey]>>
                 ) => {
-                    const result = repository.mergeRpc(typeKey, data);
-                    // Для типизации - repository.mergeRpc всегда возвращает массив
-                    // но клиентский код может ожидать разные типы в зависимости от storageType
-                    return result as any;
+                    repository.mergeRpc(typeKey, data);
                 },
                 [repository]
             );
@@ -221,20 +220,19 @@ export const createRpcHooks = <
                 return findById(id);
             }
 
-            // Для singleton возвращаем первый элемент или null
             const storageType = (repository as any).getStorageType?.(
                 String(typeKey)
             );
             const dataForKey =
                 storageType === "singleton" && list.length > 0
-                    ? list[0]
+                    ? allData
                     : storageType === "singleton"
                     ? null
                     : list;
 
             const mapForKey =
                 storageType === "singleton" && list.length > 0
-                    ? list[0]
+                    ? allData
                     : allData;
 
             return {
@@ -260,13 +258,11 @@ export const createRpcHooks = <
                 (state: RpcState<TTypes>) => state.rpc
             );
 
-            // Используем версию rpc-данных для инвалидации кэша
             const rpcVersion = React.useMemo(() => {
                 return Object.keys(allRpcData).length;
             }, [allRpcData]);
 
             const fullData = React.useMemo(() => {
-                // Привязываем пересчет к rpcVersion
                 void rpcVersion;
                 try {
                     return (repository as any).getFullRelatedData(

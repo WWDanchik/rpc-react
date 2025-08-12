@@ -189,7 +189,6 @@ export const createRpcHooks = <
                 [allData]
             );
 
-            console.log(list[0]);
 
             const findById = React.useCallback(
                 (id: string | number) => repository.findById(typeKey, id),

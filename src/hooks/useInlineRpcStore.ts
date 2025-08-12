@@ -57,6 +57,7 @@ type InlineRpcHooks<
                     ? InferRpcType<TTypes[K]>
                     : never;
             };
+            clear: () => void;
         };
         (id: string | number): InferRpcType<TTypes[K]> | null;
     };
@@ -214,6 +215,9 @@ export function useInlineRpcStore<
                     },
                     [repository, typeName, storageType]
                 );
+                const clear = React.useCallback(() => {
+                    repository.clear(typeName);
+                }, [repository]);
 
                 const collectionMap = useMemo(
                     () =>
@@ -256,6 +260,7 @@ export function useInlineRpcStore<
                     findById,
                     findAll,
                     mergeRpc,
+                    clear,
                 } as any;
             }
 

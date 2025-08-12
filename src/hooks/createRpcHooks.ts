@@ -74,6 +74,7 @@ type RpcHooks<
                         : never
                 ): InferRpcType<TTypes[K]>[];
             };
+            clear: () => void;
         };
         (id: string | number): InferRpcType<TTypes[K]> | null;
     };
@@ -189,7 +190,6 @@ export const createRpcHooks = <
                 [allData]
             );
 
-
             const findById = React.useCallback(
                 (id: string | number) => repository.findById(typeKey, id),
                 [repository]
@@ -214,6 +214,10 @@ export const createRpcHooks = <
                 },
                 [repository]
             );
+
+            const clear = React.useCallback(() => {
+                repository.clear(typeKey);
+            }, [repository]);
 
             if (id !== undefined) {
                 return findById(id);
@@ -240,6 +244,7 @@ export const createRpcHooks = <
                 findById,
                 findAll,
                 mergeRpc,
+                clear,
             } as any;
         }
 

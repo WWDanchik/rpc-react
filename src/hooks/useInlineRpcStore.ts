@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useMemo } from "react";
-import { Rpc, RpcRepository, StorageType } from "@yunu-lab/rpc-ts";
+import { Message, Rpc, RpcRepository, StorageType } from "@yunu-lab/rpc-ts";
 import { z } from "zod";
 
 type InferRpcType<T> = T extends Rpc<infer S> ? z.infer<S> : never;
@@ -60,6 +60,28 @@ type InlineRpcHooks<
             clear: () => void;
         };
         (id: string | number): InferRpcType<TTypes[K]> | null;
+    };
+} & {
+    useHandleMessages: () => {
+        handleMessages<
+            RpcStorageType extends Record<keyof TTypes, StorageType>
+        >(
+            messages: Array<Message<TTypes>>,
+            callbacks?: {
+                [K in keyof TTypes]?: (
+                    data: RpcStorageType[K] extends "collection"
+                        ?
+                              | Record<
+                                    string,
+                                    Partial<InferRpcType<TTypes[K]>> | null
+                                >
+                              | Array<InferRpcType<TTypes[K]>>
+                        : RpcStorageType[K] extends "singleton"
+                        ? Partial<InferRpcType<TTypes[K]>>
+                        : never
+                ) => void;
+            }
+        ): void;
     };
 };
 
@@ -188,36 +210,30 @@ export function useInlineRpcStore<
                             | Array<InferRpcType<TTypes[typeof typeName]>>
                             | Partial<InferRpcType<TTypes[typeof typeName]>>
                     ) => {
+                        // Единственный источник обновления UI — onDataChanged
                         repository.mergeRpc(typeName, data);
-                        const updated = repository.findAll(typeName) as Array<
-                            InferRpcType<TTypes[typeof typeName]>
-                        >;
-                        setRpcState((prev) => {
-                            const next: RpcState<TTypes> = { ...prev };
-                            if (storageType === "singleton") {
-                                next[typeName] =
-                                    updated.length > 0 ? updated[0] : null;
-                            } else {
-                                const map = updated.reduce(
-                                    (
-                                        acc: Record<string | number, any>,
-                                        item: any
-                                    ) => {
-                                        acc[(item as any).id] = item;
-                                        return acc;
-                                    },
-                                    {}
-                                );
-                                next[typeName] = map;
-                            }
-                            return next;
-                        });
                     },
-                    [repository, typeName, storageType]
+                    [repository, typeName]
                 );
                 const clear = React.useCallback(() => {
-                    repository.clear(typeName);
-                }, [repository]);
+                    if (storageType === "singleton") {
+                        // Синхронизируем локальное состояние
+                        setRpcState((prev) => ({ ...prev, [typeName]: null }));
+                    } else {
+                        const currMap = (allData || {}) as Record<
+                            string | number,
+                            any
+                        >;
+                        const deletePayload: Record<string | number, null> = {};
+                        for (const id of Object.keys(currMap)) {
+                            deletePayload[id] = null;
+                        }
+                        if (Object.keys(deletePayload).length > 0) {
+                            repository.mergeRpc(typeName, deletePayload);
+                        }
+                        setRpcState((prev) => ({ ...prev, [typeName]: {} }));
+                    }
+                }, [repository, storageType, allData]);
 
                 const collectionMap = useMemo(
                     () =>
@@ -251,6 +267,7 @@ export function useInlineRpcStore<
                         findById,
                         findAll,
                         mergeRpc,
+                        clear,
                     } as any;
                 }
 
@@ -266,6 +283,53 @@ export function useInlineRpcStore<
 
             (result as any)[hookName] = useTypeHook;
         });
+
+        function useHandleMessages() {
+            const handleMessages = (
+                messages: Array<Message<TTypes>>,
+                callbacks?: {
+                    [K in keyof TTypes]?: (
+                        data:
+                            | InferRpcType<TTypes[K]>[]
+                            | Record<
+                                  string,
+                                  Partial<InferRpcType<TTypes[K]>> | null
+                              >
+                    ) => void;
+                }
+            ) => {
+                repository.handleMessages(messages, callbacks);
+            };
+
+            const handleMessagesTyped = <
+                RpcStorageTypeMap extends Record<keyof TTypes, StorageType>
+            >(
+                messages: Array<Message<TTypes>>,
+                callbacks?: {
+                    [K in keyof TTypes]?: (
+                        data: RpcStorageTypeMap[K] extends "collection"
+                            ?
+                                  | Record<
+                                        string,
+                                        Partial<InferRpcType<TTypes[K]>> | null
+                                    >
+                                  | Array<InferRpcType<TTypes[K]>>
+                            : RpcStorageTypeMap[K] extends "singleton"
+                            ? Partial<InferRpcType<TTypes[K]>>
+                            : never
+                    ) => void;
+                }
+            ) => {
+                repository.handleMessages<RpcStorageTypeMap>(
+                    messages,
+                    callbacks
+                );
+            };
+
+            return { handleMessages, handleMessagesTyped };
+        }
+
+        (result as any).useHandleMessages = useHandleMessages;
 
         return result as InlineRpcHooks<TTypes, RpcStorageType>;
     }, [rpcs, repository, useInlineSelector]);

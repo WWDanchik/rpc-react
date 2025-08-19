@@ -1719,15 +1719,32 @@ const UsersList: React.FC = () => {
     const { users, mergeRpc } = useUser();
 
     const handleAddUser = () => {
-        const id = Math.floor(Math.random() * 1000);
-        mergeRpc({
-            [id]: {
-                age: 12,
-                name: "John Doe",
+        mergeRpc([
+            {
+                age: 120,
+                name: "John Doe 120",
                 email: "john.doe@example.com",
-                id,
+                id: 120,
             },
-        });
+            {
+                age: 1,
+                name: "John Doe 1",
+                email: "john.doe@example.com",
+                id: 1,
+            },
+            {
+                age: 12,
+                name: "John Doe12",
+                email: "john.doe@example.com",
+                id: 12,
+            },
+            {
+                age: 11,
+                name: "John Doe 11",
+                email: "john.doe@example.com",
+                id: 11,
+            },
+        ]);
     };
 
     return (

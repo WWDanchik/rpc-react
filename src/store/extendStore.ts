@@ -18,13 +18,13 @@ export const extendStore = (options: ExtendStoreOptions) => {
 
     const rpcSlice = createSlice({
         name: "rpc",
-        initialState: {} as Record<string, Record<string | number, any>>,
+        initialState: {} as Record<string, any>,
         reducers: {
             setData: (
                 state,
                 action: PayloadAction<{
                     type: string;
-                    data: Record<string | number, any>;
+                    data: any;
                 }>
             ) => {
                 const { type, data } = action.payload;
@@ -47,26 +47,23 @@ export const extendStore = (options: ExtendStoreOptions) => {
             const storageType = repository.getStorageType(String(type));
 
             if (storageType === "singleton") {
+                const nextValue = Array.isArray(payload)
+                    ? payload[0] ?? null
+                    : payload ?? null;
                 store.dispatch(
                     rpcSlice.actions.setData({
                         type: String(type),
-                        data: payload,
+                        data: nextValue,
                     })
                 );
             } else {
-                const dataObject = payload.reduce(
-                    (acc: Record<string | number, any>, item: any) => {
-                        const id = item.id;
-                        acc[id] = item;
-                        return acc;
-                    },
-                    {}
-                );
-
+                const nextArray = Array.isArray(payload)
+                    ? payload
+                    : Object.values(payload || {});
                 store.dispatch(
                     rpcSlice.actions.setData({
                         type: String(type),
-                        data: dataObject,
+                        data: nextArray,
                     })
                 );
             }

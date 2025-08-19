@@ -52,7 +52,6 @@ const InlineDemo: React.FC = () => {
     const { errors, mergeRpc: mergeError } = useError();
 
     const { cells, mergeRpc: mergeCell } = useCell();
-    console.log(cells);
 
     const addUser = () => {
         const id = Math.floor(Math.random() * 1000);
@@ -101,6 +100,36 @@ const InlineDemo: React.FC = () => {
                 <button
                     onClick={() =>
                         mergeCell({
+                            3: {
+                                id: 3,
+                                name: "Cell 13",
+                                type: "pallet",
+                                is_stretched: true,
+                                parent_cell_id: 12,
+                                code: "13",
+                                warehouse_id: 1,
+                                products: [
+                                    {
+                                        id: 2,
+                                        barcodes: [{ id: 3 }, { id: 4 }],
+                                    },
+                                ],
+                            },
+                            130: {
+                                id: 130,
+                                name: "Cell 13",
+                                type: "pallet",
+                                is_stretched: true,
+                                parent_cell_id: 12,
+                                code: "13",
+                                warehouse_id: 1,
+                                products: [
+                                    {
+                                        id: 2,
+                                        barcodes: [{ id: 3 }, { id: 4 }],
+                                    },
+                                ],
+                            },
                             12: {
                                 id: 12,
                                 name: "Cell 12",

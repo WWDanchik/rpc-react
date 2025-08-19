@@ -157,7 +157,7 @@ export function useInlineRpcStore<
             repo.registerRpc(String(key), rpc, { storageType });
         });
         return repo;
-    }, [typeNames]);
+    }, [typeNames, rpcs]);
 
     const [rpcState, setRpcState] = React.useState<RpcState<TTypes>>({});
 
@@ -172,19 +172,15 @@ export function useInlineRpcStore<
                             repository as any
                         ).getStorageType?.(String(type));
                         if (storageType === "singleton") {
-                            next[type] = event.payload ?? null;
+                            next[type] = Array.isArray(event.payload)
+                                ? event.payload[0] ?? null
+                                : event.payload ?? null;
                         } else {
-                            const map = (event.payload as any[]).reduce(
-                                (
-                                    acc: Record<string | number, any>,
-                                    item: any
-                                ) => {
-                                    acc[item.id] = item;
-                                    return acc;
-                                },
-                                {}
-                            );
-                            next[type] = map;
+                            // Store arrays for collections
+                            const nextArray = Array.isArray(event.payload)
+                                ? event.payload
+                                : Object.values(event.payload || {});
+                            next[type] = nextArray;
                         }
                     }
                     return next;
@@ -199,12 +195,11 @@ export function useInlineRpcStore<
         };
     }, [repository, typeNames]);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const useInlineSelector = <TSelected>(
+    const useInlineSelector = React.useCallback(<TSelected>(
         selector: (state: RpcState<TTypes>) => TSelected
     ): TSelected => {
         return selector(rpcState);
-    };
+    }, [rpcState]);
 
     const hooks = React.useMemo<InlineRpcHooks<TTypes, RpcStorageType>>(() => {
         const toPascalCase = (s: string): string =>
@@ -250,7 +245,7 @@ export function useInlineRpcStore<
                         // Единственный источник обновления UI — onDataChanged
                         repository.mergeRpc(typeName, data);
                     },
-                    [repository, typeName]
+                    []
                 );
                 const clear = React.useCallback(() => {
                     if (storageType === "singleton") {
@@ -270,25 +265,28 @@ export function useInlineRpcStore<
                         }
                         setRpcState((prev) => ({ ...prev, [typeName]: {} }));
                     }
-                }, [repository, storageType, allData]);
+                }, [allData]);
 
-                const collectionMap = useMemo(
+                const list = useMemo(
                     () =>
-                        (storageType === "singleton"
-                            ? {}
-                            : allData || {}) as Record<
-                            string | number,
+                        (Array.isArray(allData)
+                            ? allData
+                            : Object.values(allData || {})) as Array<
                             InferRpcType<TTypes[typeof typeName]>
                         >,
                     [allData]
                 );
-                const list = useMemo(
-                    () =>
-                        Object.values(collectionMap) as Array<
-                            InferRpcType<TTypes[typeof typeName]>
-                        >,
-                    [collectionMap]
-                );
+                const collectionMap = useMemo(() => {
+                    const rec: Record<string | number, InferRpcType<TTypes[typeof typeName]>> = {} as any;
+                    if (Array.isArray(list)) {
+                        for (const item of list as Array<any>) {
+                            if (item && ("id" in item)) {
+                                rec[(item as any).id as any] = item as any;
+                            }
+                        }
+                    }
+                    return rec;
+                }, [list]);
 
                 if (id !== undefined) {
                     return findById(id);
@@ -423,7 +421,7 @@ export function useInlineRpcStore<
                 return () => {
                     repository.offDataChanged(unsub);
                 };
-            }, [repository, typesKey]);
+            }, [typesKey, types]);
             return () => {};
         }
 
@@ -477,7 +475,7 @@ export function useInlineRpcStore<
         (result as any).useHandleMessages = useHandleMessages;
 
         return result as InlineRpcHooks<TTypes, RpcStorageType>;
-    }, [rpcs, repository, useInlineSelector]);
+    }, [rpcs, repository, useInlineSelector, typeNames]);
 
     return { hooks, repository } as const;
 }

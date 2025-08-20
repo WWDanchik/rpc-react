@@ -146,8 +146,12 @@ export function useInlineRpcStore<
 >(rpcs: InlineRpcsConfig<TTypes, RpcStorageType>) {
     const typeNames = React.useMemo(
         () => Object.keys(rpcs) as Array<keyof TTypes>,
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [JSON.stringify(Object.keys(rpcs).sort())]
+        [rpcs]
+    );
+
+    const typeNamesKey = React.useMemo(
+        () => Object.keys(rpcs).map(String).sort().join("|"),
+        [rpcs]
     );
 
     const repository = React.useMemo(() => {
@@ -157,20 +161,22 @@ export function useInlineRpcStore<
             repo.registerRpc(String(key), rpc, { storageType });
         });
         return repo;
-    }, [typeNames, rpcs]);
+    }, [typeNamesKey]);
 
     const [rpcState, setRpcState] = React.useState<RpcState<TTypes>>({});
 
     React.useEffect(() => {
         const unsubscribe = repository.onDataChanged(
             (events: Array<{ type: keyof TTypes; payload: any }>) => {
+                console.log(events);
+
                 setRpcState((prev) => {
                     const next: RpcState<TTypes> = { ...prev };
                     for (const event of events) {
                         const type = event.type as keyof TTypes;
-                        const storageType = (
-                            repository as any
-                        ).getStorageType?.(String(type));
+                        const storageType =
+                            (rpcs as any)[type]?.storageType ??
+                            (repository as any).getStorageType?.(String(type));
                         if (storageType === "singleton") {
                             next[type] = Array.isArray(event.payload)
                                 ? event.payload[0] ?? null
@@ -193,13 +199,16 @@ export function useInlineRpcStore<
         return () => {
             repository.offDataChanged(unsubscribe);
         };
-    }, [repository, typeNames]);
+    }, [repository, typeNamesKey]);
 
-    const useInlineSelector = React.useCallback(<TSelected>(
-        selector: (state: RpcState<TTypes>) => TSelected
-    ): TSelected => {
-        return selector(rpcState);
-    }, [rpcState]);
+    const useInlineSelector = React.useCallback(
+        <TSelected>(
+            selector: (state: RpcState<TTypes>) => TSelected
+        ): TSelected => {
+            return selector(rpcState);
+        },
+        [rpcState]
+    );
 
     const hooks = React.useMemo<InlineRpcHooks<TTypes, RpcStorageType>>(() => {
         const toPascalCase = (s: string): string =>
@@ -252,18 +261,23 @@ export function useInlineRpcStore<
                         // Синхронизируем локальное состояние
                         setRpcState((prev) => ({ ...prev, [typeName]: null }));
                     } else {
-                        const currMap = (allData || {}) as Record<
-                            string | number,
-                            any
-                        >;
+                        const ids: Array<string | number> = Array.isArray(
+                            allData
+                        )
+                            ? ((allData as Array<any>)
+                                  .map((item) =>
+                                      item ? (item as any).id : undefined
+                                  )
+                                  .filter((v) => v !== undefined) as Array<
+                                  string | number
+                              >)
+                            : Object.keys((allData as any) || {});
                         const deletePayload: Record<string | number, null> = {};
-                        for (const id of Object.keys(currMap)) {
-                            deletePayload[id] = null;
-                        }
+                        for (const id of ids) deletePayload[id] = null;
                         if (Object.keys(deletePayload).length > 0) {
                             repository.mergeRpc(typeName, deletePayload);
                         }
-                        setRpcState((prev) => ({ ...prev, [typeName]: {} }));
+                        setRpcState((prev) => ({ ...prev, [typeName]: [] }));
                     }
                 }, [allData]);
 
@@ -277,10 +291,19 @@ export function useInlineRpcStore<
                     [allData]
                 );
                 const collectionMap = useMemo(() => {
-                    const rec: Record<string | number, InferRpcType<TTypes[typeof typeName]>> = {} as any;
+                    const rec: Record<
+                        string | number,
+                        InferRpcType<TTypes[typeof typeName]>
+                    > = {} as any;
+
                     if (Array.isArray(list)) {
                         for (const item of list as Array<any>) {
-                            if (item && ("id" in item)) {
+                            if (
+                                item &&
+                                typeof item === "object" &&
+                                !Array.isArray(item) &&
+                                "id" in (item as Record<string, unknown>)
+                            ) {
                                 rec[(item as any).id as any] = item as any;
                             }
                         }

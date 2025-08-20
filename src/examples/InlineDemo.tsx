@@ -45,20 +45,26 @@ const InlineDemo: React.FC = () => {
         cell: { rpc: cellRpc, storageType: "collection" },
     });
 
-    const { useUser, useError, useCell } = hooks;
+    const { useUser, useError, useCell, useHandleMessages } = hooks;
 
     const { users, mergeRpc: mergeUser } = useUser();
 
     const { errors, mergeRpc: mergeError } = useError();
 
     const { cells, mergeRpc: mergeCell } = useCell();
-
+    const { handleMessages } = useHandleMessages();
     const addUser = () => {
         const id = Math.floor(Math.random() * 1000);
 
-        mergeUser({
-            [id]: { id, name: "Alice", email: "alice@example.com" },
-        });
+        handleMessages([
+            {
+                type: "user",
+                payload: [
+                    { id, name: "Alice", email: "alice@example.com" },
+                    { id: 2, name: "Bob", email: "bob@example.com" },
+                ],
+            },
+        ]);
     };
 
     const setError = () => {
